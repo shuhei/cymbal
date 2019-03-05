@@ -1,0 +1,7 @@
+[package]
+name = "monkey"
+version = "0.1.0"
+authors = ["Shuhei Kagawa <shuhei.kagawa@gmail.com>"]
+edition = "2018"
+
+[dependencies]
