@@ -1,9 +1,9 @@
-extern crate monkey;
+extern crate cymbal;
 
 #[cfg(test)]
 mod lexer_tests {
-    use monkey::token::TokenKind;
-    use monkey::lexer::Lexer;
+    use cymbal::token::TokenKind;
+    use cymbal::lexer::Lexer;
 
     #[test]
     fn next_token() {
