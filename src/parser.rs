@@ -1,15 +1,15 @@
 use crate::lexer::Lexer;
 use crate::token::Token;
-use crate::ast::{Program, Statement};
+use crate::ast::{Expression, Program, Statement};
 
-enum Precendence {
-    LOWEST,
-    EQUALS, // ==
-    LESSGREATER, // > or <
-    SUM, // +
-    PRODUCT, // *
-    PREFIX, // -X or !X
-    CALL, // myFunction(X)
+enum Precedence {
+    Lowest,
+    Equals, // ==
+    Lessgreater, // > or <
+    Sum, // +
+    Product, // *
+    Prefix, // -X or !X
+    Call, // myFunction(X)
 }
 
 pub struct Parser {
@@ -99,8 +99,37 @@ impl Parser {
         Some(Statement::Return)
     }
 
-    fn parse_expression_statement(&self) -> Option<Statement> {
-        None
+    fn parse_expression_statement(&mut self) -> Option<Statement> {
+        let expression = self.parse_expression(Precedence::Lowest);
+
+        if self.peek_token == Token::Semicolon {
+            self.next_token();
+        }
+
+        expression.map(|exp| Statement::Expression(exp))
+    }
+
+    fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
+        self.parse_prefix(self.cur_token.clone())
+    }
+
+    fn parse_prefix(&mut self, token: Token) -> Option<Expression> {
+        match token {
+            Token::Ident(ident) => Some(Expression::Identifier(ident)),
+            Token::Int(int) => {
+                match int.parse() {
+                    Ok(value) => Some(Expression::IntegerLiteral(value)),
+                    Err(_) => {
+                        let msg = format!("could not parse '{}' as integer", int);
+                        self.errors.push(msg);
+                        None
+                    }
+                }
+            },
+            // Token::Bang => self.parse_prefix_expression(),
+            // Token::Minus => self.parse_prefix_expression(),
+            _ => None,
+        }
     }
 
     fn expect_peek(&mut self, token: Token) -> bool {

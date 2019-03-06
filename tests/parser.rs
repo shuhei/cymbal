@@ -2,13 +2,12 @@ extern crate cymbal;
 
 #[cfg(test)]
 mod parser_tests {
-    use cymbal::token::Token;
     use cymbal::lexer::Lexer;
     use cymbal::parser::Parser;
-    use cymbal::ast::Statement;
+    use cymbal::ast::{Expression, Statement};
 
     #[test]
-    fn let_statements() {
+    fn let_statement() {
 	let input = "
             let x = 5;
             let y = 10;
@@ -18,11 +17,63 @@ mod parser_tests {
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program();
+        check_parser_errors(&parser);
 
         assert_eq!(program.statements, vec![
             Statement::Let("x".to_string()),
             Statement::Let("y".to_string()),
             Statement::Let("foobar".to_string()),
+        ]);
+    }
+
+    #[test]
+    fn return_statement() {
+        let input = "
+            return 5;
+            return 10;
+            return 993322;
+        ";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+
+        assert_eq!(program.statements, vec![
+            Statement::Return,
+            Statement::Return,
+            Statement::Return,
+        ]);
+    }
+
+    #[test]
+    fn identifier_expression() {
+        let input = "foobar;";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+
+        assert_eq!(program.statements, vec![
+            Statement::Expression(Expression::Identifier("foobar".to_string())),
+        ]);
+    }
+
+    #[test]
+    fn integer_literal_expression() {
+        let input = "5;";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+
+        assert_eq!(program.statements, vec![
+            Statement::Expression(Expression::IntegerLiteral(5)),
         ]);
     }
 
