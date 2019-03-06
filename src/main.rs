@@ -1,3 +1,5 @@
+use cymbal::repl;
+
 fn main() {
-    println!("Hello, world!");
+    repl::start();
 }

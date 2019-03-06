@@ -38,6 +38,7 @@ pub enum TokenKind {
     Return,
 }
 
+#[derive(Debug)]
 pub struct Token {
     // `type` is a keyword in Rust
     pub kind: TokenKind,
