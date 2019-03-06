@@ -1,11 +1,11 @@
 #[derive(Debug, PartialEq)]
-pub enum TokenKind {
+pub enum Token {
     Illegal,
     Eof,
 
     // Identifiers + literals
-    Ident, // add, foobar, x, y, ...
-    Int, // 123456
+    Ident(String), // add, foobar, x, y, ...
+    Int(String), // 123456
 
     // Operators
     Assign,
@@ -38,26 +38,19 @@ pub enum TokenKind {
     Return,
 }
 
-#[derive(Debug)]
-pub struct Token {
-    // `type` is a keyword in Rust
-    pub kind: TokenKind,
-    pub literal: String,
+pub fn lookup_ident(ident: &str) -> Token {
+    keyword_to_token_kind(ident).unwrap_or(Token::Ident(ident.to_owned()))
 }
 
-pub fn lookup_ident(ident: &str) -> TokenKind {
-    keyword_to_token_kind(ident).unwrap_or(TokenKind::Ident)
-}
-
-fn keyword_to_token_kind(keyword: &str) -> Option<TokenKind> {
+fn keyword_to_token_kind(keyword: &str) -> Option<Token> {
     match keyword {
-        "fn" => Some(TokenKind::Function),
-        "let" => Some(TokenKind::Let),
-        "true" => Some(TokenKind::True),
-        "false" => Some(TokenKind::False),
-        "if" => Some(TokenKind::If),
-        "else" => Some(TokenKind::Else),
-        "return" => Some(TokenKind::Return),
+        "fn" => Some(Token::Function),
+        "let" => Some(Token::Let),
+        "true" => Some(Token::True),
+        "false" => Some(Token::False),
+        "if" => Some(Token::If),
+        "else" => Some(Token::Else),
+        "return" => Some(Token::Return),
         _ => None,
     }
 }

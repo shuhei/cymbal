@@ -1,5 +1,5 @@
 use crate::token;
-use crate::token::{Token, TokenKind};
+use crate::token::{Token};
 
 pub struct Lexer {
     input: String,
@@ -8,7 +8,8 @@ pub struct Lexer {
     // current reading position in input (after current char)
     read_position: usize,
     // current char under examination
-    ch: char, }
+    ch: char,
+}
 
 impl Lexer {
     pub fn new(input: &str) -> Self {
@@ -30,83 +31,66 @@ impl Lexer {
             '=' => {
                 if self.peek_char() == '=' {
                     self.read_char();
-                    let literal = "==";
-                    tok = Token {
-                        kind: TokenKind::Eq,
-                        literal: literal.to_owned(),
-                    };
+                    tok = Token::Eq;
                 } else {
-                    tok = new_token(TokenKind::Assign, self.ch);
+                    tok = Token::Assign;
                 }
             }
             ';' => {
-                tok = new_token(TokenKind::Semicolon, self.ch);
+                tok = Token::Semicolon;
             }
             '(' => {
-                tok = new_token(TokenKind::Lparen, self.ch);
+                tok = Token::Lparen;
             }
             ')' => {
-                tok = new_token(TokenKind::Rparen, self.ch);
+                tok = Token::Rparen;
             }
             ',' => {
-                tok = new_token(TokenKind::Comma, self.ch);
+                tok = Token::Comma;
             }
             '+' => {
-                tok = new_token(TokenKind::Plus, self.ch);
+                tok = Token::Plus;
             }
             '-' => {
-                tok = new_token(TokenKind::Minus, self.ch);
+                tok = Token::Minus;
             }
             '!' => {
                 if self.peek_char() == '=' {
                     self.read_char();
-                    let literal = "!=";
-                    tok = Token {
-                        kind: TokenKind::NotEq,
-                        literal: literal.to_owned(),
-                    };
+                    tok = Token::NotEq;
                 } else {
-                    tok = new_token(TokenKind::Bang, self.ch);
+                    tok = Token::Bang;
                 }
             }
             '*' => {
-                tok = new_token(TokenKind::Asterisk, self.ch);
+                tok = Token::Asterisk;
             }
             '/' => {
-                tok = new_token(TokenKind::Slash, self.ch);
+                tok = Token::Slash;
             }
             '<' => {
-                tok = new_token(TokenKind::Lt, self.ch);
+                tok = Token::Lt;
             }
             '>' => {
-                tok = new_token(TokenKind::Gt, self.ch);
+                tok = Token::Gt;
             }
             '{' => {
-                tok = new_token(TokenKind::Lbrace, self.ch);
+                tok = Token::Lbrace;
             }
             '}' => {
-                tok = new_token(TokenKind::Rbrace, self.ch);
+                tok = Token::Rbrace;
             }
             '\u{0}' => {
-                tok = Token {
-                    kind: TokenKind::Eof,
-                    literal: "".to_owned(),
-                }
+                tok = Token::Eof;
             }
             _ => {
                 if is_letter(self.ch) {
                     let ident = self.read_identifier();
-                    return Token {
-                        kind: token::lookup_ident(ident),
-                        literal: ident.to_owned(),
-                    };
+                    return token::lookup_ident(ident);
                 } else if is_digit(self.ch) {
-                    return Token {
-                        kind: TokenKind::Int,
-                        literal: self.read_number().to_owned(),
-                    };
+                    return Token::Int(self.read_number().to_owned());
                 } else {
-                    tok = new_token(TokenKind::Illegal, self.ch);
+                    tok = Token::Illegal
                 }
             }
         }
@@ -167,11 +151,4 @@ fn is_digit(ch: char) -> bool {
 
 fn is_whitespace(ch: char) -> bool {
     ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
-}
-
-fn new_token(kind: TokenKind, ch: char) -> Token {
-    Token {
-        kind,
-        literal: ch.to_string(),
-    }
 }
