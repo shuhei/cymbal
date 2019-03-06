@@ -126,10 +126,18 @@ impl Parser {
                     }
                 }
             },
-            // Token::Bang => self.parse_prefix_expression(),
-            // Token::Minus => self.parse_prefix_expression(),
+            Token::Bang => self.parse_prefix_expression(),
+            Token::Minus => self.parse_prefix_expression(),
             _ => None,
         }
+    }
+
+    fn parse_prefix_expression(&mut self) -> Option<Expression> {
+        let operator = self.cur_token.clone();
+        self.next_token();
+        let expression = self.parse_expression(Precedence::Prefix);
+
+        expression.map(|exp| Expression::Prefix(operator.to_string(), Box::new(exp)))
     }
 
     fn expect_peek(&mut self, token: Token) -> bool {
