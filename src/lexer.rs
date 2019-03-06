@@ -22,7 +22,7 @@ impl Lexer {
         lexer
     }
 
-    pub fn next_token(self: &mut Self) -> Token {
+    pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
         let tok: Token;
@@ -116,7 +116,7 @@ impl Lexer {
     }
 
     // TODO: Support unicode.
-    fn read_char(self: &mut Self) {
+    fn read_char(&mut self) {
         // TODO: Better way of indexing a string.
         self.ch = self
             .input
@@ -127,7 +127,7 @@ impl Lexer {
         self.read_position += 1;
     }
 
-    fn read_identifier(self: &mut Self) -> &str {
+    fn read_identifier(&mut self) -> &str {
         let position = self.position;
         while is_letter(self.ch) {
             self.read_char();
@@ -135,7 +135,7 @@ impl Lexer {
         &self.input[position..self.position]
     }
 
-    fn read_number(self: &mut Self) -> &str {
+    fn read_number(&mut self) -> &str {
         let position = self.position;
         while is_digit(self.ch) {
             self.read_char();
@@ -143,13 +143,13 @@ impl Lexer {
         &self.input[position..self.position]
     }
 
-    fn skip_whitespace(self: &mut Self) {
+    fn skip_whitespace(&mut self) {
         while is_whitespace(self.ch) {
             self.read_char();
         }
     }
 
-    fn peek_char(self: &Self) -> char {
+    fn peek_char(&self) -> char {
         self.input
             .chars()
             .nth(self.read_position)
