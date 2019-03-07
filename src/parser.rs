@@ -1,16 +1,16 @@
+use crate::ast::{Expression, Infix, Prefix, Program, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
-use crate::ast::{Expression, Program, Statement, Infix, Prefix};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 enum Precedence {
     Lowest,
-    Equals, // ==
+    Equals,      // ==
     LessGreater, // > or <
-    Sum, // +
-    Product, // *
-    Prefix, // -X or !X
-    Call, // myFunction(X)
+    Sum,         // +
+    Product,     // *
+    Prefix,      // -X or !X
+                 // Call, // myFunction(X)
 }
 
 type PrefixParseFn = fn(&mut Parser) -> Option<Expression>;
@@ -71,18 +71,18 @@ impl Parser {
             Token::Ident(ident) => {
                 self.next_token();
                 name = ident;
-            },
+            }
             _ => {
                 self.peek_error("identifier");
                 return None;
-            },
+            }
         }
 
         if !self.expect_peek(Token::Assign) {
             return None;
         }
 
-	// TODO: Skipping the expressions until we encounter a semicolon
+        // TODO: Skipping the expressions until we encounter a semicolon
         while self.cur_token != Token::Semicolon {
             self.next_token();
         }
@@ -94,7 +94,7 @@ impl Parser {
     fn parse_return_statement(&mut self) -> Option<Statement> {
         self.next_token();
 
-	// TODO: Skipping the expressions until we encounter a semicolon
+        // TODO: Skipping the expressions until we encounter a semicolon
         while self.cur_token != Token::Semicolon {
             self.next_token();
         }
@@ -117,13 +117,15 @@ impl Parser {
         if let Some(prefix) = self.prefix_parse_fn() {
             if let Some(left) = prefix(self) {
                 let mut left_exp = left;
-                while self.peek_token != Token::Semicolon && precedence < self.infix_token(&self.peek_token).0 {
+                while self.peek_token != Token::Semicolon
+                    && precedence < self.infix_token(&self.peek_token).0
+                {
                     if let Some(infix) = self.infix_parse_fn() {
                         self.next_token();
                         if let Some(i) = infix(self, left_exp) {
                             left_exp = i;
                         } else {
-                            return None
+                            return None;
                         }
                     } else {
                         return Some(left_exp);
@@ -172,13 +174,12 @@ impl Parser {
     }
 
     fn parse_prefix_expression(&mut self) -> Option<Expression> {
-        self.prefix_token(&self.cur_token)
-            .and_then(|p| {
-                self.next_token();
-                let expression = self.parse_expression(Precedence::Prefix);
+        self.prefix_token(&self.cur_token).and_then(|p| {
+            self.next_token();
+            let expression = self.parse_expression(Precedence::Prefix);
 
-                expression.map(|exp| Expression::Prefix(p, Box::new(exp)))
-            })
+            expression.map(|exp| Expression::Prefix(p, Box::new(exp)))
+        })
     }
 
     fn infix_parse_fn(&self) -> Option<InfixParseFn> {
@@ -191,7 +192,7 @@ impl Parser {
             Token::NotEq => Some(Parser::parse_infix_expression),
             Token::Lt => Some(Parser::parse_infix_expression),
             Token::Gt => Some(Parser::parse_infix_expression),
-            _ => None
+            _ => None,
         }
     }
 
@@ -239,7 +240,10 @@ impl Parser {
     }
 
     fn peek_error(&mut self, expected: &str) {
-        let msg = format!("expected next token to be {}, got {} instead", expected, self.peek_token);
+        let msg = format!(
+            "expected next token to be {}, got {} instead",
+            expected, self.peek_token
+        );
         self.errors.push(msg);
     }
 }

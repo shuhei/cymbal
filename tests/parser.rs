@@ -2,13 +2,13 @@ extern crate cymbal;
 
 #[cfg(test)]
 mod parser_tests {
+    use cymbal::ast::{Expression, Infix, Prefix, Statement};
     use cymbal::lexer::Lexer;
     use cymbal::parser::Parser;
-    use cymbal::ast::{Expression, Statement, Infix, Prefix};
 
     #[test]
     fn let_statement() {
-	let input = "
+        let input = "
             let x = 5;
             let y = 10;
             let foobar = 838383;
@@ -19,11 +19,14 @@ mod parser_tests {
         let program = parser.parse_program();
         check_parser_errors(&parser);
 
-        assert_eq!(program.statements, vec![
-            Statement::Let("x".to_string()),
-            Statement::Let("y".to_string()),
-            Statement::Let("foobar".to_string()),
-        ]);
+        assert_eq!(
+            program.statements,
+            vec![
+                Statement::Let("x".to_string()),
+                Statement::Let("y".to_string()),
+                Statement::Let("foobar".to_string()),
+            ]
+        );
     }
 
     #[test]
@@ -40,11 +43,10 @@ mod parser_tests {
         let program = parser.parse_program();
         check_parser_errors(&parser);
 
-        assert_eq!(program.statements, vec![
-            Statement::Return,
-            Statement::Return,
-            Statement::Return,
-        ]);
+        assert_eq!(
+            program.statements,
+            vec![Statement::Return, Statement::Return, Statement::Return,]
+        );
     }
 
     #[test]
@@ -57,9 +59,12 @@ mod parser_tests {
         let program = parser.parse_program();
         check_parser_errors(&parser);
 
-        assert_eq!(program.statements, vec![
-            Statement::Expression(Expression::Identifier("foobar".to_string())),
-        ]);
+        assert_eq!(
+            program.statements,
+            vec![Statement::Expression(Expression::Identifier(
+                "foobar".to_string()
+            )),]
+        );
     }
 
     #[test]
@@ -72,17 +77,15 @@ mod parser_tests {
         let program = parser.parse_program();
         check_parser_errors(&parser);
 
-        assert_eq!(program.statements, vec![
-            Statement::Expression(Expression::IntegerLiteral(5)),
-        ]);
+        assert_eq!(
+            program.statements,
+            vec![Statement::Expression(Expression::IntegerLiteral(5)),]
+        );
     }
 
     #[test]
     fn prefix_expression() {
-        let tests = vec![
-            ("!5;", Prefix::Bang, 5),
-            ("-15;", Prefix::Minus, 15),
-        ];
+        let tests = vec![("!5;", Prefix::Bang, 5), ("-15;", Prefix::Minus, 15)];
         for (input, operator, value) in tests {
             let lexer = Lexer::new(input);
             let mut parser = Parser::new(lexer);
@@ -90,14 +93,13 @@ mod parser_tests {
             let program = parser.parse_program();
             check_parser_errors(&parser);
 
-            assert_eq!(program.statements, vec![
-                Statement::Expression(
-                    Expression::Prefix(
-                        operator,
-                        Box::new(Expression::IntegerLiteral(value))
-                    )
-                )
-            ]);
+            assert_eq!(
+                program.statements,
+                vec![Statement::Expression(Expression::Prefix(
+                    operator,
+                    Box::new(Expression::IntegerLiteral(value))
+                ))]
+            );
         }
     }
 
@@ -120,18 +122,46 @@ mod parser_tests {
             let program = parser.parse_program();
             check_parser_errors(&parser);
 
-            assert_eq!(program.statements, vec![
-                Statement::Expression(
-                    Expression::Infix(
-                        operator,
-                        Box::new(Expression::IntegerLiteral(left)),
-                        Box::new(Expression::IntegerLiteral(right))
-                    )
-                )
-            ]);
+            assert_eq!(
+                program.statements,
+                vec![Statement::Expression(Expression::Infix(
+                    operator,
+                    Box::new(Expression::IntegerLiteral(left)),
+                    Box::new(Expression::IntegerLiteral(right))
+                ))]
+            );
         }
     }
 
+    #[test]
+    fn operator_precedence() {
+        let tests = vec![
+            ("-a * b", "((-a) * b);"),
+            ("!-a", "(!(-a));"),
+            ("a + b + c", "((a + b) + c);"),
+            ("a + b - c", "((a + b) - c);"),
+            ("a * b * c", "((a * b) * c);"),
+            ("a * b / c", "((a * b) / c);"),
+            ("a + b / c", "(a + (b / c));"),
+            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f);"),
+            ("3 + 4; -5 * 5", "(3 + 4);((-5) * 5);"),
+            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4));"),
+            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4));"),
+            (
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)));",
+            ),
+        ];
+        for (input, expected) in tests {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+
+            let program = parser.parse_program();
+            check_parser_errors(&parser);
+
+            assert_eq!(program.to_string(), expected);
+        }
+    }
 
     fn check_parser_errors(parser: &Parser) {
         assert_eq!(parser.errors.len(), 0, "parser errors: {:?}", parser.errors);
