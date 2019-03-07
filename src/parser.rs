@@ -1,11 +1,12 @@
 use crate::lexer::Lexer;
 use crate::token::Token;
-use crate::ast::{Expression, Program, Statement};
+use crate::ast::{Expression, Program, Statement, Infix, Prefix};
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 enum Precedence {
     Lowest,
     Equals, // ==
-    Lessgreater, // > or <
+    LessGreater, // > or <
     Sum, // +
     Product, // *
     Prefix, // -X or !X
@@ -110,12 +111,28 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
-        self.parse_prefix(self.cur_token.clone())
+        match self.parse_prefix() {
+            Some(left) => {
+                let mut left_exp = left;
+                while self.peek_token != Token::Semicolon && precedence < self.infix_token(&self.peek_token).0 {
+                    match self.parse_infix(left_exp.clone()) {
+                        Some(i) => {
+                            left_exp = i;
+                        },
+                        None => {
+                            return Some(left_exp);
+                        }
+                    };
+                }
+                return Some(left_exp);
+            },
+            None => None,
+        }
     }
 
-    fn parse_prefix(&mut self, token: Token) -> Option<Expression> {
-        match token {
-            Token::Ident(ident) => Some(Expression::Identifier(ident)),
+    fn parse_prefix(&mut self) -> Option<Expression> {
+        match &self.cur_token {
+            Token::Ident(ident) => Some(Expression::Identifier(ident.to_string())),
             Token::Int(int) => {
                 match int.parse() {
                     Ok(value) => Some(Expression::IntegerLiteral(value)),
@@ -133,11 +150,61 @@ impl Parser {
     }
 
     fn parse_prefix_expression(&mut self) -> Option<Expression> {
-        let operator = self.cur_token.clone();
-        self.next_token();
-        let expression = self.parse_expression(Precedence::Prefix);
+        self.prefix_token(&self.cur_token)
+            .and_then(|p| {
+                self.next_token();
+                let expression = self.parse_expression(Precedence::Prefix);
 
-        expression.map(|exp| Expression::Prefix(operator.to_string(), Box::new(exp)))
+                expression.map(|exp| Expression::Prefix(p, Box::new(exp)))
+            })
+    }
+
+    fn parse_infix(&mut self, left_exp: Expression) -> Option<Expression> {
+        match self.peek_token.clone() {
+            Token::Plus => self.parse_infix_expression(left_exp),
+            Token::Minus => self.parse_infix_expression(left_exp),
+            Token::Asterisk => self.parse_infix_expression(left_exp),
+            Token::Slash => self.parse_infix_expression(left_exp),
+            Token::Eq => self.parse_infix_expression(left_exp),
+            Token::NotEq => self.parse_infix_expression(left_exp),
+            Token::Lt => self.parse_infix_expression(left_exp),
+            Token::Gt => self.parse_infix_expression(left_exp),
+            _ => None
+        }
+    }
+
+    fn parse_infix_expression(&mut self, left: Expression) -> Option<Expression> {
+        self.next_token();
+        let (precedence, infix) = self.infix_token(&self.cur_token);
+        infix.and_then(|i| {
+            self.next_token();
+            let right = self.parse_expression(precedence);
+
+            // TODO: Get a string from operator, or create an infix operator enum.
+            right.map(|r| Expression::Infix(i, Box::new(left), Box::new(r)))
+        })
+    }
+
+    fn prefix_token(&self, token: &Token) -> Option<Prefix> {
+        match token {
+            Token::Bang => Some(Prefix::Bang),
+            Token::Minus => Some(Prefix::Minus),
+            _ => None,
+        }
+    }
+
+    fn infix_token(&self, token: &Token) -> (Precedence, Option<Infix>) {
+        match token {
+            Token::Eq => (Precedence::Equals, Some(Infix::Eq)),
+            Token::NotEq => (Precedence::Equals, Some(Infix::NotEq)),
+            Token::Lt => (Precedence::LessGreater, Some(Infix::Lt)),
+            Token::Gt => (Precedence::LessGreater, Some(Infix::Gt)),
+            Token::Plus => (Precedence::Sum, Some(Infix::Plus)),
+            Token::Minus => (Precedence::Sum, Some(Infix::Minus)),
+            Token::Slash => (Precedence::Product, Some(Infix::Slash)),
+            Token::Asterisk => (Precedence::Product, Some(Infix::Asterisk)),
+            _ => (Precedence::Lowest, None),
+        }
     }
 
     fn expect_peek(&mut self, token: Token) -> bool {

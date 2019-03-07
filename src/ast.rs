@@ -1,5 +1,4 @@
 use std::fmt;
-use crate::token::Token;
 
 #[derive(Debug, PartialEq)]
 pub enum Node {
@@ -32,11 +31,12 @@ impl fmt::Display for Statement {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Identifier(String),
     IntegerLiteral(i64),
-    Prefix(String, Box<Expression>),
+    Prefix(Prefix, Box<Expression>),
+    Infix(Infix, Box<Expression>, Box<Expression>),
 }
 
 impl fmt::Display for Expression {
@@ -45,6 +45,49 @@ impl fmt::Display for Expression {
             Expression::Identifier(ident) => write!(f, "{}", ident),
             Expression::IntegerLiteral(int) => write!(f, "{}", int),
             Expression::Prefix(operator, exp) => write!(f, "({}{})", operator, exp),
+            Expression::Infix(operator, left, right) => write!(f, "({} {} {})", left, operator, right),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Infix {
+    Eq,
+    NotEq,
+    Lt,
+    Gt,
+    Plus,
+    Minus,
+    Asterisk,
+    Slash,
+}
+
+impl fmt::Display for Infix {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Infix::Eq => write!(f, "=="),
+            Infix::NotEq => write!(f, "!="),
+            Infix::Lt => write!(f, "<"),
+            Infix::Gt => write!(f, ">"),
+            Infix::Plus => write!(f, "+"),
+            Infix::Minus => write!(f, "-"),
+            Infix::Asterisk => write!(f, "*"),
+            Infix::Slash => write!(f, "/"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Prefix {
+    Bang,
+    Minus,
+}
+
+impl fmt::Display for Prefix {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Prefix::Bang => write!(f, "!"),
+            Prefix::Minus => write!(f, "-"),
         }
     }
 }

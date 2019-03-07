@@ -4,7 +4,7 @@ extern crate cymbal;
 mod parser_tests {
     use cymbal::lexer::Lexer;
     use cymbal::parser::Parser;
-    use cymbal::ast::{Expression, Statement};
+    use cymbal::ast::{Expression, Statement, Infix, Prefix};
 
     #[test]
     fn let_statement() {
@@ -80,8 +80,8 @@ mod parser_tests {
     #[test]
     fn prefix_expression() {
         let tests = vec![
-            ("!5;", "!", 5),
-            ("-15;", "-", 15),
+            ("!5;", Prefix::Bang, 5),
+            ("-15;", Prefix::Minus, 15),
         ];
         for (input, operator, value) in tests {
             let lexer = Lexer::new(input);
@@ -93,13 +93,45 @@ mod parser_tests {
             assert_eq!(program.statements, vec![
                 Statement::Expression(
                     Expression::Prefix(
-                        operator.to_string(),
+                        operator,
                         Box::new(Expression::IntegerLiteral(value))
                     )
                 )
             ]);
         }
     }
+
+    #[test]
+    fn infix_expression() {
+        let tests = vec![
+            ("5 + 5;", 5, Infix::Plus, 5),
+            ("5 - 5;", 5, Infix::Minus, 5),
+            ("5 * 5;", 5, Infix::Asterisk, 5),
+            ("5 / 5;", 5, Infix::Slash, 5),
+            ("5 > 5;", 5, Infix::Gt, 5),
+            ("5 < 5;", 5, Infix::Lt, 5),
+            ("5 == 5;", 5, Infix::Eq, 5),
+            ("5 != 5;", 5, Infix::NotEq, 5),
+        ];
+        for (input, left, operator, right) in tests {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+
+            let program = parser.parse_program();
+            check_parser_errors(&parser);
+
+            assert_eq!(program.statements, vec![
+                Statement::Expression(
+                    Expression::Infix(
+                        operator,
+                        Box::new(Expression::IntegerLiteral(left)),
+                        Box::new(Expression::IntegerLiteral(right))
+                    )
+                )
+            ]);
+        }
+    }
+
 
     fn check_parser_errors(parser: &Parser) {
         assert_eq!(parser.errors.len(), 0, "parser errors: {:?}", parser.errors);
