@@ -13,6 +13,9 @@ enum Precedence {
     Call, // myFunction(X)
 }
 
+type PrefixParseFn = fn(&mut Parser) -> Option<Expression>;
+type InfixParseFn = fn(&mut Parser, Expression) -> Option<Expression>;
+
 pub struct Parser {
     lexer: Lexer,
     pub errors: Vec<String>,
@@ -111,41 +114,60 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
-        match self.parse_prefix() {
-            Some(left) => {
+        if let Some(prefix) = self.prefix_parse_fn() {
+            if let Some(left) = prefix(self) {
                 let mut left_exp = left;
                 while self.peek_token != Token::Semicolon && precedence < self.infix_token(&self.peek_token).0 {
-                    match self.parse_infix(left_exp.clone()) {
-                        Some(i) => {
+                    if let Some(infix) = self.infix_parse_fn() {
+                        self.next_token();
+                        if let Some(i) = infix(self, left_exp) {
                             left_exp = i;
-                        },
-                        None => {
-                            return Some(left_exp);
+                        } else {
+                            return None
                         }
-                    };
+                    } else {
+                        return Some(left_exp);
+                    }
                 }
-                return Some(left_exp);
-            },
-            None => None,
+                Some(left_exp)
+            } else {
+                None
+            }
+        } else {
+            None
         }
     }
 
-    fn parse_prefix(&mut self) -> Option<Expression> {
+    fn prefix_parse_fn(&self) -> Option<PrefixParseFn> {
         match &self.cur_token {
-            Token::Ident(ident) => Some(Expression::Identifier(ident.to_string())),
-            Token::Int(int) => {
-                match int.parse() {
-                    Ok(value) => Some(Expression::IntegerLiteral(value)),
-                    Err(_) => {
-                        let msg = format!("could not parse '{}' as integer", int);
-                        self.errors.push(msg);
-                        None
-                    }
-                }
-            },
-            Token::Bang => self.parse_prefix_expression(),
-            Token::Minus => self.parse_prefix_expression(),
+            Token::Ident(_) => Some(Parser::parse_identifier),
+            Token::Int(_) => Some(Parser::parse_integer_literal),
+            Token::Bang => Some(Parser::parse_prefix_expression),
+            Token::Minus => Some(Parser::parse_prefix_expression),
             _ => None,
+        }
+    }
+
+    fn parse_identifier(&mut self) -> Option<Expression> {
+        if let Token::Ident(ident) = &self.cur_token {
+            Some(Expression::Identifier(ident.to_string()))
+        } else {
+            None
+        }
+    }
+
+    fn parse_integer_literal(&mut self) -> Option<Expression> {
+        if let Token::Int(int) = &self.cur_token {
+            match int.parse() {
+                Ok(value) => Some(Expression::IntegerLiteral(value)),
+                Err(_) => {
+                    let msg = format!("could not parse '{}' as integer", int);
+                    self.errors.push(msg);
+                    None
+                }
+            }
+        } else {
+            None
         }
     }
 
@@ -159,22 +181,21 @@ impl Parser {
             })
     }
 
-    fn parse_infix(&mut self, left_exp: Expression) -> Option<Expression> {
+    fn infix_parse_fn(&self) -> Option<InfixParseFn> {
         match self.peek_token.clone() {
-            Token::Plus => self.parse_infix_expression(left_exp),
-            Token::Minus => self.parse_infix_expression(left_exp),
-            Token::Asterisk => self.parse_infix_expression(left_exp),
-            Token::Slash => self.parse_infix_expression(left_exp),
-            Token::Eq => self.parse_infix_expression(left_exp),
-            Token::NotEq => self.parse_infix_expression(left_exp),
-            Token::Lt => self.parse_infix_expression(left_exp),
-            Token::Gt => self.parse_infix_expression(left_exp),
+            Token::Plus => Some(Parser::parse_infix_expression),
+            Token::Minus => Some(Parser::parse_infix_expression),
+            Token::Asterisk => Some(Parser::parse_infix_expression),
+            Token::Slash => Some(Parser::parse_infix_expression),
+            Token::Eq => Some(Parser::parse_infix_expression),
+            Token::NotEq => Some(Parser::parse_infix_expression),
+            Token::Lt => Some(Parser::parse_infix_expression),
+            Token::Gt => Some(Parser::parse_infix_expression),
             _ => None
         }
     }
 
     fn parse_infix_expression(&mut self, left: Expression) -> Option<Expression> {
-        self.next_token();
         let (precedence, infix) = self.infix_token(&self.cur_token);
         infix.and_then(|i| {
             self.next_token();
