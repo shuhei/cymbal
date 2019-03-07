@@ -3,14 +3,14 @@ use crate::lexer::Lexer;
 use crate::token::Token;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
-enum Precedence {
+pub enum Precedence {
     Lowest,
     Equals,      // ==
     LessGreater, // > or <
     Sum,         // +
     Product,     // *
     Prefix,      // -X or !X
-                 // Call, // myFunction(X)
+    Call,        // myFunction(X)
 }
 
 type PrefixParseFn = fn(&mut Parser) -> Option<Expression>;
@@ -144,6 +144,8 @@ impl Parser {
         match &self.cur_token {
             Token::Ident(_) => Some(Parser::parse_identifier),
             Token::Int(_) => Some(Parser::parse_integer_literal),
+            Token::True => Some(Parser::parse_boolean),
+            Token::False => Some(Parser::parse_boolean),
             Token::Bang => Some(Parser::parse_prefix_expression),
             Token::Minus => Some(Parser::parse_prefix_expression),
             _ => None,
@@ -180,6 +182,14 @@ impl Parser {
 
             expression.map(|exp| Expression::Prefix(p, Box::new(exp)))
         })
+    }
+
+    fn parse_boolean(&mut self) -> Option<Expression> {
+        match &self.cur_token {
+            Token::True => Some(Expression::Boolean(true)),
+            Token::False => Some(Expression::Boolean(false)),
+            _ => None
+        }
     }
 
     fn infix_parse_fn(&self) -> Option<InfixParseFn> {
