@@ -202,7 +202,6 @@ impl Parser {
             self.next_token();
             let right = self.parse_expression(precedence);
 
-            // TODO: Get a string from operator, or create an infix operator enum.
             right.map(|r| Expression::Infix(i, Box::new(left), Box::new(r)))
         })
     }
