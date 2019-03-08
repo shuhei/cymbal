@@ -190,6 +190,8 @@ mod parser_tests {
             ("2 / (5 + 5)", "(2 / (5 + 5));"),
             ("-(5 + 5)", "(-(5 + 5));"),
             ("!(true == true)", "(!(true == true));"),
+            ("if (x < y) { x }", "if (x < y) { x; };"),
+            ("if (x < y) { x } else { y }", "if (x < y) { x; } else { y; };"),
         ];
         for (input, expected) in tests {
             let lexer = Lexer::new(input);
@@ -203,6 +205,7 @@ mod parser_tests {
     }
 
     fn check_parser_errors(parser: &Parser) {
-        assert_eq!(parser.errors.len(), 0, "parser errors: {:?}", parser.errors);
+        let errors = parser.errors();
+        assert_eq!(errors.len(), 0, "For input '{}', got parser errors: {:?}", parser.input(), errors);
     }
 }

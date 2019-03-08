@@ -23,6 +23,10 @@ impl Lexer {
         lexer
     }
 
+    pub fn input(&self) -> &str {
+        &self.input
+    }
+
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 

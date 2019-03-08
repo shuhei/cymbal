@@ -21,7 +21,21 @@ impl fmt::Display for Program {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
+pub struct BlockStatement {
+    pub statements: Vec<Statement>,
+}
+
+impl fmt::Display for BlockStatement {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for stmt in &self.statements {
+            write!(f, "{{ {} }}", stmt)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Let(String),
     Return,
@@ -47,6 +61,7 @@ pub enum Expression {
     Boolean(bool),
     Prefix(Prefix, Box<Expression>),
     Infix(Infix, Box<Expression>, Box<Expression>),
+    If(Box<Expression>, BlockStatement, Option<BlockStatement>),
 }
 
 impl fmt::Display for Expression {
@@ -56,7 +71,16 @@ impl fmt::Display for Expression {
             Expression::IntegerLiteral(int) => write!(f, "{}", int),
             Expression::Boolean(value) => write!(f, "{}", value),
             Expression::Prefix(operator, exp) => write!(f, "({}{})", operator, exp),
-            Expression::Infix(operator, left, right) => write!(f, "({} {} {})", left, operator, right),
+            Expression::Infix(operator, left, right) => {
+                write!(f, "({} {} {})", left, operator, right)
+            },
+            Expression::If(condition, consequence, alternative) => {
+                write!(f, "if {} {}", condition, consequence)?;
+                if let Some(alt) = alternative {
+                    write!(f, " else {}", alt)?;
+                }
+                Ok(())
+            }
         }
     }
 }

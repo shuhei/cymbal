@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Infix, Prefix, Program, Statement};
+use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
 
@@ -22,7 +22,10 @@ pub enum ParserError {
     ExpectedIdentifierToken(Token),
     ExpectedBooleanToken(Token),
     ExpectedIntegerToken(Token),
+    ExpectedLparen(Token),
     ExpectedRparen(Token),
+    ExpectedLbrace(Token),
+    ExpectedRbrace(Token),
     ExpectedAssign(Token),
     ParseInt(String),
 }
@@ -32,7 +35,7 @@ type InfixParseFn = fn(&mut Parser, Expression) -> Result<Expression>;
 
 pub struct Parser {
     lexer: Lexer,
-    pub errors: Vec<ParserError>,
+    errors: Vec<ParserError>,
 
     cur_token: Token,
     peek_token: Token,
@@ -51,6 +54,14 @@ impl Parser {
         p
     }
 
+    pub fn input(&self) -> &str {
+        self.lexer.input()
+    }
+
+    pub fn errors(&self) -> &[ParserError] {
+        &self.errors
+    }
+
     fn next_token(&mut self) {
         // TODO: Without the `.clone()`, rustc complains
         // `cannot move out of borrowed content`... Why?
@@ -62,7 +73,6 @@ impl Parser {
         let mut statements = vec![];
 
         while self.cur_token != Token::Eof {
-            // TODO: Don't ignore errors. Push errors to `self.errors`.
             match self.parse_statement() {
                 Ok(stmt) => {
                     statements.push(stmt);
@@ -99,10 +109,7 @@ impl Parser {
             }
         }
 
-        if self.peek_token != Token::Assign {
-            return Err(ParserError::ExpectedAssign(self.peek_token.clone()));
-        }
-        self.next_token();
+        self.expect_peek(Token::Assign, ParserError::ExpectedAssign)?;
 
         // TODO: Skipping the expressions until we encounter a semicolon
         while self.cur_token != Token::Semicolon {
@@ -135,6 +142,18 @@ impl Parser {
         expression.map(|exp| Statement::Expression(exp))
     }
 
+    fn parse_block_statement(&mut self) -> Result<BlockStatement> {
+        let mut statements = vec![];
+
+        self.next_token();
+        while self.cur_token != Token::Rbrace && self.cur_token != Token::Eof {
+            statements.push(self.parse_statement()?);
+            self.next_token();
+        }
+
+        Ok(BlockStatement { statements })
+    }
+
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression> {
         let prefix = self
             .prefix_parse_fn()
@@ -162,6 +181,7 @@ impl Parser {
             Token::Bang => Some(Parser::parse_prefix_expression),
             Token::Minus => Some(Parser::parse_prefix_expression),
             Token::Lparen => Some(Parser::parse_grouped_expression),
+            Token::If => Some(Parser::parse_if_expression),
             _ => None,
         }
     }
@@ -198,12 +218,23 @@ impl Parser {
 
         let exp = self.parse_expression(Precedence::Lowest)?;
 
-        if self.peek_token != Token::Rparen {
-            return Err(ParserError::ExpectedRparen(self.peek_token.clone()));
-        }
-        self.next_token();
+        self.expect_peek(Token::Rparen, ParserError::ExpectedRparen)?;
 
         Ok(exp)
+    }
+
+    fn parse_if_expression(&mut self) -> Result<Expression> {
+        self.expect_peek(Token::Lparen, ParserError::ExpectedLparen)?;
+
+        self.next_token();
+        let condition = self.parse_expression(Precedence::Lowest)?;
+
+        self.expect_peek(Token::Rparen, ParserError::ExpectedRparen)?;
+        self.expect_peek(Token::Lbrace, ParserError::ExpectedLbrace)?;
+
+        let consequence = self.parse_block_statement()?;
+
+        Ok(Expression::If(Box::new(condition), consequence, None))
     }
 
     fn parse_boolean(&mut self) -> Result<Expression> {
@@ -257,5 +288,13 @@ impl Parser {
             Token::Asterisk => (Precedence::Product, Some(Infix::Asterisk)),
             _ => (Precedence::Lowest, None),
         }
+    }
+
+    fn expect_peek(&mut self, token: Token, expected: fn(Token) -> ParserError) -> Result<()> {
+        if self.peek_token != token {
+            return Err(expected(self.peek_token.clone()));
+        }
+        self.next_token();
+        Ok(())
     }
 }
