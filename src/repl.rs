@@ -1,7 +1,8 @@
-use std::io;
-use std::io::Write;
+use crate::evaluator;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
+use std::io;
+use std::io::Write;
 
 pub fn start() {
     let mut stdout = io::stdout();
@@ -11,7 +12,9 @@ pub fn start() {
     loop {
         print!(">> ");
         stdout.flush().expect("Failed to flush stdout");
-        stdin.read_line(&mut input).expect("Failed to read line from stdin");
+        stdin
+            .read_line(&mut input)
+            .expect("Failed to read line from stdin");
 
         let lexer = Lexer::new(input.trim());
         let mut parser = Parser::new(lexer);
@@ -25,7 +28,7 @@ pub fn start() {
             }
             continue;
         }
-        println!("{}", program);
+        println!("{}", evaluator::eval(program));
 
         input.clear();
     }
