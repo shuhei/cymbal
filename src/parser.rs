@@ -116,7 +116,10 @@ impl Parser {
         let value = self.parse_expression(Precedence::Lowest)?;
         // cur_token: the last token of the value expression
 
-        self.expect_peek(Token::Semicolon, ParserError::ExpectedSemicolon)?;
+        if self.peek_token == Token::Semicolon {
+            self.next_token();
+            // cur_token: ;
+        }
 
         Ok(Statement::Let(name, value))
     }
@@ -133,8 +136,10 @@ impl Parser {
         let expression = self.parse_expression(Precedence::Lowest)?;
         // cur_token: the last token of the expression
 
-        self.expect_peek(Token::Semicolon, ParserError::ExpectedSemicolon)?;
-        // cur_token: ;
+        if self.peek_token == Token::Semicolon {
+            self.next_token();
+            // cur_token: ;
+        }
 
         Ok(Statement::Return(Some(expression)))
     }

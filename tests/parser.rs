@@ -208,6 +208,8 @@ mod parser_tests {
                 "if (x < y) { x } else { y }",
                 "if (x < y) { x; } else { y; };",
             ),
+            ("return x", "return x;"),
+            ("return x return 2 * 3", "return x;return (2 * 3);"),
             ("return 2 * 4 + 5;", "return ((2 * 4) + 5);"),
             ("fn() { 3 * 9; }", "fn() { (3 * 9); };"),
             ("fn(x) { x * 9; }", "fn(x) { (x * 9); };"),
@@ -221,7 +223,8 @@ mod parser_tests {
             ),
             ("add(a + b + c * d / f + g)", "add((((a + b) + ((c * d) / f)) + g));"),
             ("fn(x, y) { x + y; }(3, 4)", "fn(x, y) { (x + y); }(3, 4);"),
-            ("let x = 3 + f * 8;", "let x = (3 + (f * 8));"),
+            ("let x = 3", "let x = 3;"),
+            ("let x = 3 + f * 8;", "let x = (3 + (f * 8));")
         ];
         for (input, expected) in tests {
             let lexer = Lexer::new(input);
