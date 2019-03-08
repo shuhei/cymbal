@@ -148,6 +148,7 @@ impl Parser {
             Token::False => Some(Parser::parse_boolean),
             Token::Bang => Some(Parser::parse_prefix_expression),
             Token::Minus => Some(Parser::parse_prefix_expression),
+            Token::Lparen => Some(Parser::parse_grouped_expression),
             _ => None,
         }
     }
@@ -182,6 +183,19 @@ impl Parser {
 
             expression.map(|exp| Expression::Prefix(p, Box::new(exp)))
         })
+    }
+
+    fn parse_grouped_expression(&mut self) -> Option<Expression> {
+        self.next_token();
+
+        if let Some(exp) = self.parse_expression(Precedence::Lowest) {
+            if !self.expect_peek(Token::Rparen) {
+                return None
+            }
+            Some(exp)
+        } else {
+            None
+        }
     }
 
     fn parse_boolean(&mut self) -> Option<Expression> {
