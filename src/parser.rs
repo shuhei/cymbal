@@ -262,7 +262,11 @@ impl Parser {
             // cur_token: }
         }
 
-        Ok(Expression::If(Box::new(condition), consequence, alternative))
+        Ok(Expression::If(
+            Box::new(condition),
+            consequence,
+            alternative,
+        ))
     }
 
     fn parse_function_literal(&mut self) -> Result<Expression> {

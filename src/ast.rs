@@ -74,17 +74,17 @@ impl fmt::Display for Expression {
             Expression::Prefix(operator, exp) => write!(f, "({}{})", operator, exp),
             Expression::Infix(operator, left, right) => {
                 write!(f, "({} {} {})", left, operator, right)
-            },
+            }
             Expression::If(condition, consequence, alternative) => {
                 write!(f, "if {} {}", condition, consequence)?;
                 if let Some(alt) = alternative {
                     write!(f, " else {}", alt)?;
                 }
                 Ok(())
-            },
+            }
             Expression::FunctionLiteral(parameters, body) => {
                 write!(f, "fn({}) {}", parameters.join(", "), body)
-            },
+            }
         }
     }
 }
