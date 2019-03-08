@@ -234,7 +234,14 @@ impl Parser {
 
         let consequence = self.parse_block_statement()?;
 
-        Ok(Expression::If(Box::new(condition), consequence, None))
+        let mut alternative = None;
+        if self.peek_token == Token::Else {
+            self.next_token();
+            self.expect_peek(Token::Lbrace, ParserError::ExpectedLbrace)?;
+            alternative = Some(self.parse_block_statement()?);
+        }
+
+        Ok(Expression::If(Box::new(condition), consequence, alternative))
     }
 
     fn parse_boolean(&mut self) -> Result<Expression> {
@@ -290,6 +297,13 @@ impl Parser {
         }
     }
 
+    // Assert that `peek_token` is the expected one. If so, proceed one token. Otherwise,
+    // return an error.
+    //
+    // For example:
+    // When `cur_token` is `if`, the parser expects `peek_token` to be `(`.
+    // If the expectation is matched, it proceeds to the next token (`cur_token` is `(` and
+    // `peek_token` is the first token of the condition.
     fn expect_peek(&mut self, token: Token, expected: fn(Token) -> ParserError) -> Result<()> {
         if self.peek_token != token {
             return Err(expected(self.peek_token.clone()));
