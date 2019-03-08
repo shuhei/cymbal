@@ -32,6 +32,7 @@ mod parser_tests {
     #[test]
     fn return_statement() {
         let input = "
+            return;
             return 5;
             return 10;
             return 993322;
@@ -45,7 +46,12 @@ mod parser_tests {
 
         assert_eq!(
             program.statements,
-            vec![Statement::Return, Statement::Return, Statement::Return,]
+            vec![
+                Statement::Return(None),
+                Statement::Return(Some(Expression::IntegerLiteral(5))),
+                Statement::Return(Some(Expression::IntegerLiteral(10))),
+                Statement::Return(Some(Expression::IntegerLiteral(993322))),
+            ]
         );
     }
 
@@ -191,7 +197,11 @@ mod parser_tests {
             ("-(5 + 5)", "(-(5 + 5));"),
             ("!(true == true)", "(!(true == true));"),
             ("if (x < y) { x }", "if (x < y) { x; };"),
-            ("if (x < y) { x } else { y }", "if (x < y) { x; } else { y; };"),
+            (
+                "if (x < y) { x } else { y }",
+                "if (x < y) { x; } else { y; };",
+            ),
+            ("return 2 * 4 + 5;", "return ((2 * 4) + 5);"),
             ("fn() { 3 * 9; }", "fn() { (3 * 9); };"),
             ("fn(x) { x * 9; }", "fn(x) { (x * 9); };"),
             ("fn(x, y) { x + y; }", "fn(x, y) { (x + y); };"),
@@ -209,6 +219,12 @@ mod parser_tests {
 
     fn check_parser_errors(parser: &Parser) {
         let errors = parser.errors();
-        assert_eq!(errors.len(), 0, "For input '{}', got parser errors: {:?}", parser.input(), errors);
+        assert_eq!(
+            errors.len(),
+            0,
+            "For input '{}', got parser errors: {:?}",
+            parser.input(),
+            errors
+        );
     }
 }

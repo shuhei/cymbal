@@ -27,6 +27,7 @@ pub enum ParserError {
     ExpectedLbrace(Token),
     ExpectedRbrace(Token),
     ExpectedAssign(Token),
+    ExpectedSemicolon(Token),
     ParseInt(String),
 }
 
@@ -121,15 +122,21 @@ impl Parser {
     }
 
     fn parse_return_statement(&mut self) -> Result<Statement> {
+        // cur_token: return
         self.next_token();
+        // cur_token: ; or the first token of the expression
 
-        // TODO: Skipping the expressions until we encounter a semicolon
-        while self.cur_token != Token::Semicolon {
-            self.next_token();
+        if self.cur_token == Token::Semicolon {
+            return Ok(Statement::Return(None));
         }
 
-        // TODO: Return value.
-        Ok(Statement::Return)
+        let expression = self.parse_expression(Precedence::Lowest)?;
+        // cur_token: the last token of the expression
+
+        self.expect_peek(Token::Semicolon, ParserError::ExpectedSemicolon)?;
+        // cur_token: ;
+
+        Ok(Statement::Return(Some(expression)))
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement> {
