@@ -16,6 +16,7 @@ pub enum Precedence {
 type Result<T> = std::result::Result<T, ParserError>;
 
 enum ParserError {
+    // TODO: Have more detailed error kinds.
     Error
 }
 
