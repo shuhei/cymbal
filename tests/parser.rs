@@ -11,7 +11,7 @@ mod parser_tests {
         let input = "
             let x = 5;
             let y = 10;
-            let foobar = 838383;
+            let foobar = x + y;
         ";
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
@@ -22,9 +22,16 @@ mod parser_tests {
         assert_eq!(
             program.statements,
             vec![
-                Statement::Let("x".to_string()),
-                Statement::Let("y".to_string()),
-                Statement::Let("foobar".to_string()),
+                Statement::Let("x".to_string(), Expression::IntegerLiteral(5)),
+                Statement::Let("y".to_string(), Expression::IntegerLiteral(10)),
+                Statement::Let(
+                    "foobar".to_string(),
+                    Expression::Infix(
+                        Infix::Plus,
+                        Box::new(Expression::Identifier("x".to_string())),
+                        Box::new(Expression::Identifier("y".to_string()))
+                    )
+                )
             ]
         );
     }
@@ -214,6 +221,7 @@ mod parser_tests {
             ),
             ("add(a + b + c * d / f + g)", "add((((a + b) + ((c * d) / f)) + g));"),
             ("fn(x, y) { x + y; }(3, 4)", "fn(x, y) { (x + y); }(3, 4);"),
+            ("let x = 3 + f * 8;", "let x = (3 + (f * 8));"),
         ];
         for (input, expected) in tests {
             let lexer = Lexer::new(input);

@@ -97,28 +97,28 @@ impl Parser {
     }
 
     fn parse_let_statement(&mut self) -> Result<Statement> {
+        // cur_token: let
         let name;
-        match self.peek_token.clone() {
-            Token::Ident(ident) => {
-                self.next_token();
-                name = ident;
-            }
-            _ => {
-                return Err(ParserError::ExpectedIdentifierToken(
-                    self.peek_token.clone(),
-                ));
-            }
+        if let Token::Ident(ident) = self.peek_token.clone() {
+            self.next_token();
+            name = ident;
+        } else {
+            return Err(ParserError::ExpectedIdentifierToken(
+                self.peek_token.clone(),
+            ));
         }
 
         self.expect_peek(Token::Assign, ParserError::ExpectedAssign)?;
+        // cur_token: =
+        self.next_token();
+        // cur_token: the first token of the value expression
 
-        // TODO: Skipping the expressions until we encounter a semicolon
-        while self.cur_token != Token::Semicolon {
-            self.next_token();
-        }
+        let value = self.parse_expression(Precedence::Lowest)?;
+        // cur_token: the last token of the value expression
 
-        // TODO: Let assignment.
-        Ok(Statement::Let(name))
+        self.expect_peek(Token::Semicolon, ParserError::ExpectedSemicolon)?;
+
+        Ok(Statement::Let(name, value))
     }
 
     fn parse_return_statement(&mut self) -> Result<Statement> {
