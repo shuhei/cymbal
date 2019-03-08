@@ -62,6 +62,7 @@ pub enum Expression {
     Infix(Infix, Box<Expression>, Box<Expression>),
     If(Box<Expression>, BlockStatement, Option<BlockStatement>),
     FunctionLiteral(Vec<String>, BlockStatement),
+    Call(Box<Expression>, Vec<Expression>),
 }
 
 impl fmt::Display for Expression {
@@ -84,6 +85,16 @@ impl fmt::Display for Expression {
             Expression::FunctionLiteral(parameters, body) => {
                 write!(f, "fn({}) {}", parameters.join(", "), body)
             }
+            Expression::Call(function, arguments) => write!(
+                f,
+                "{}({})",
+                function,
+                arguments
+                    .iter()
+                    .map(|a| a.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
         }
     }
 }

@@ -162,17 +162,23 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression> {
+        // cur_token: the first token of the expression
         let prefix = self
             .prefix_parse_fn()
             .ok_or_else(|| ParserError::ExpectedPrefixToken(self.cur_token.clone()))?;
         let mut left_exp = prefix(self)?;
+        // cur_token: the last token of the left expression
+
         while self.peek_token != Token::Semicolon
             && precedence < self.infix_token(&self.peek_token).0
         {
             if let Some(infix) = self.infix_parse_fn() {
                 self.next_token();
+                // cur_token: the infix token
                 left_exp = infix(self, left_exp)?;
+                // cur_token: the last token of the right expression
             } else {
+                // No infix operator
                 return Ok(left_exp);
             }
         }
@@ -302,7 +308,7 @@ impl Parser {
     }
 
     fn infix_parse_fn(&self) -> Option<InfixParseFn> {
-        match self.peek_token.clone() {
+        match &self.peek_token {
             Token::Plus => Some(Parser::parse_infix_expression),
             Token::Minus => Some(Parser::parse_infix_expression),
             Token::Asterisk => Some(Parser::parse_infix_expression),
@@ -311,6 +317,7 @@ impl Parser {
             Token::NotEq => Some(Parser::parse_infix_expression),
             Token::Lt => Some(Parser::parse_infix_expression),
             Token::Gt => Some(Parser::parse_infix_expression),
+            Token::Lparen => Some(Parser::parse_call_expression),
             _ => None,
         }
     }
@@ -322,6 +329,45 @@ impl Parser {
         let right = self.parse_expression(precedence)?;
 
         Ok(Expression::Infix(i, Box::new(left), Box::new(right)))
+    }
+
+    fn parse_call_expression(&mut self, function: Expression) -> Result<Expression> {
+        // cur_token: (
+        let arguments = self.parse_call_arguments()?;
+        // cur_token: )
+        Ok(Expression::Call(Box::new(function), arguments))
+    }
+
+    fn parse_call_arguments(&mut self) -> Result<Vec<Expression>> {
+        // cur_token: (
+        let mut arguments = vec![];
+
+        // No parameters
+        if self.peek_token == Token::Rparen {
+            self.next_token();
+            // cur_token: )
+            return Ok(arguments);
+        }
+
+        self.next_token();
+        // cur_token: the first token of the first argument expression
+
+        arguments.push(self.parse_expression(Precedence::Lowest)?);
+        // cur_token: the last token of the first argument expression
+
+        while self.peek_token == Token::Comma {
+            self.next_token();
+            // cur_token: ,
+            self.next_token();
+            // cur_token: the first token of the current argument expression
+            arguments.push(self.parse_expression(Precedence::Lowest)?);
+            // cur_token: the last token of the current argument expression
+        }
+
+        self.expect_peek(Token::Rparen, ParserError::ExpectedRparen)?;
+        // cur_token: )
+
+        Ok(arguments)
     }
 
     fn parse_function_parameters(&mut self) -> Result<Vec<String>> {
@@ -374,6 +420,7 @@ impl Parser {
             Token::Minus => (Precedence::Sum, Some(Infix::Minus)),
             Token::Slash => (Precedence::Product, Some(Infix::Slash)),
             Token::Asterisk => (Precedence::Product, Some(Infix::Asterisk)),
+            Token::Lparen => (Precedence::Call, None),
             _ => (Precedence::Lowest, None),
         }
     }
