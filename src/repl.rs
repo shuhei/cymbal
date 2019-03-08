@@ -18,6 +18,8 @@ pub fn start() {
 
         let program = parser.parse_program();
         if parser.errors().len() > 0 {
+            println!("Woops! We ran into some monkey business here!");
+            println!(" parser errors:");
             for error in parser.errors() {
                 println!("\t{:?}", error);
             }
