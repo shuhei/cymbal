@@ -85,7 +85,12 @@ mod parser_tests {
 
     #[test]
     fn prefix_expression() {
-        let tests = vec![("!5;", Prefix::Bang, 5), ("-15;", Prefix::Minus, 15)];
+        let tests = vec![
+            ("!5;", Prefix::Bang, Expression::IntegerLiteral(5)),
+            ("-15;", Prefix::Minus, Expression::IntegerLiteral(15)),
+            ("!true;", Prefix::Bang, Expression::Boolean(true)),
+            ("!false;", Prefix::Bang, Expression::Boolean(false)),
+        ];
         for (input, operator, value) in tests {
             let lexer = Lexer::new(input);
             let mut parser = Parser::new(lexer);
@@ -97,14 +102,14 @@ mod parser_tests {
                 program.statements,
                 vec![Statement::Expression(Expression::Prefix(
                     operator,
-                    Box::new(Expression::IntegerLiteral(value))
+                    Box::new(value)
                 ))]
             );
         }
     }
 
     #[test]
-    fn infix_expression() {
+    fn infix_expression_integer() {
         let tests = vec![
             ("5 + 5;", 5, Infix::Plus, 5),
             ("5 - 5;", 5, Infix::Minus, 5),
@@ -128,6 +133,31 @@ mod parser_tests {
                     operator,
                     Box::new(Expression::IntegerLiteral(left)),
                     Box::new(Expression::IntegerLiteral(right))
+                ))]
+            );
+        }
+    }
+
+    #[test]
+    fn infix_expression_boolean() {
+        let tests = vec![
+            ("true == true", true, Infix::Eq, true),
+            ("true != false", true, Infix::NotEq, false),
+            ("false == false", false, Infix::Eq, false),
+        ];
+        for (input, left, operator, right) in tests {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+
+            let program = parser.parse_program();
+            check_parser_errors(&parser);
+
+            assert_eq!(
+                program.statements,
+                vec![Statement::Expression(Expression::Infix(
+                    operator,
+                    Box::new(Expression::Boolean(left)),
+                    Box::new(Expression::Boolean(right))
                 ))]
             );
         }
