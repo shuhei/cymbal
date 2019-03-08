@@ -15,9 +15,12 @@ pub enum Precedence {
 
 type Result<T> = std::result::Result<T, ParserError>;
 
-enum ParserError {
+#[derive(Debug)]
+pub enum ParserError {
     // TODO: Have more detailed error kinds.
-    Error
+    Error,
+    UnexpectedToken(Token, Token),
+    ParseInt(String),
 }
 
 type PrefixParseFn = fn(&mut Parser) -> Result<Expression>;
@@ -25,7 +28,7 @@ type InfixParseFn = fn(&mut Parser, Expression) -> Result<Expression>;
 
 pub struct Parser {
     lexer: Lexer,
-    pub errors: Vec<String>,
+    pub errors: Vec<ParserError>,
 
     cur_token: Token,
     peek_token: Token,
@@ -55,9 +58,14 @@ impl Parser {
         let mut statements = vec![];
 
         while self.cur_token != Token::Eof {
-            // TODO: Don't ignore errors?
-            if let Ok(stmt) = self.parse_statement() {
-                statements.push(stmt);
+            // TODO: Don't ignore errors. Push errors to `self.errors`.
+            match self.parse_statement() {
+                Ok(stmt) => {
+                    statements.push(stmt);
+                },
+                Err(err) => {
+                    self.errors.push(err);
+                },
             }
             self.next_token();
         }
@@ -81,14 +89,14 @@ impl Parser {
                 name = ident;
             }
             _ => {
-                self.peek_error("identifier");
-                return Err(ParserError::Error);
+                return Err(ParserError::UnexpectedToken(
+                    self.peek_token.clone(),
+                    Token::Ident("xxx".to_string()),
+                ));
             }
         }
 
-        if !self.expect_peek(Token::Assign) {
-            return Err(ParserError::Error);
-        }
+        self.expect_peek(Token::Assign)?;
 
         // TODO: Skipping the expressions until we encounter a semicolon
         while self.cur_token != Token::Semicolon {
@@ -163,9 +171,7 @@ impl Parser {
             match int.parse() {
                 Ok(value) => Ok(Expression::IntegerLiteral(value)),
                 Err(_) => {
-                    let msg = format!("could not parse '{}' as integer", int);
-                    self.errors.push(msg);
-                    Err(ParserError::Error)
+                    Err(ParserError::ParseInt(int.to_string()))
                 }
             }
         } else {
@@ -185,9 +191,8 @@ impl Parser {
         self.next_token();
 
         let exp = self.parse_expression(Precedence::Lowest)?;
-        if !self.expect_peek(Token::Rparen) {
-            return Err(ParserError::Error);
-        }
+        self.expect_peek(Token::Rparen)?;
+
         Ok(exp)
     }
 
@@ -195,7 +200,7 @@ impl Parser {
         match &self.cur_token {
             Token::True => Ok(Expression::Boolean(true)),
             Token::False => Ok(Expression::Boolean(false)),
-            _ => Err(ParserError::Error)
+            _ => Err(ParserError::Error),
         }
     }
 
@@ -244,21 +249,12 @@ impl Parser {
         }
     }
 
-    fn expect_peek(&mut self, token: Token) -> bool {
+    fn expect_peek(&mut self, token: Token) -> Result<()> {
         if self.peek_token == token {
             self.next_token();
-            return true;
+            Ok(())
         } else {
-            self.peek_error(&token.to_string());
-            return false;
+            Err(ParserError::UnexpectedToken(self.peek_token.clone(), token))
         }
-    }
-
-    fn peek_error(&mut self, expected: &str) {
-        let msg = format!(
-            "expected next token to be {}, got {} instead",
-            expected, self.peek_token
-        );
-        self.errors.push(msg);
     }
 }
