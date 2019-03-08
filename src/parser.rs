@@ -17,9 +17,13 @@ type Result<T> = std::result::Result<T, ParserError>;
 
 #[derive(Debug)]
 pub enum ParserError {
-    // TODO: Have more detailed error kinds.
-    Error,
-    UnexpectedToken(Token, Token),
+    ExpectedPrefixToken(Token),
+    ExpectedInfixToken(Token),
+    ExpectedIdentifierToken(Token),
+    ExpectedBooleanToken(Token),
+    ExpectedIntegerToken(Token),
+    ExpectedRparen(Token),
+    ExpectedAssign(Token),
     ParseInt(String),
 }
 
@@ -62,10 +66,10 @@ impl Parser {
             match self.parse_statement() {
                 Ok(stmt) => {
                     statements.push(stmt);
-                },
+                }
                 Err(err) => {
                     self.errors.push(err);
-                },
+                }
             }
             self.next_token();
         }
@@ -89,14 +93,16 @@ impl Parser {
                 name = ident;
             }
             _ => {
-                return Err(ParserError::UnexpectedToken(
+                return Err(ParserError::ExpectedIdentifierToken(
                     self.peek_token.clone(),
-                    Token::Ident("xxx".to_string()),
                 ));
             }
         }
 
-        self.expect_peek(Token::Assign)?;
+        if self.peek_token != Token::Assign {
+            return Err(ParserError::ExpectedAssign(self.peek_token.clone()));
+        }
+        self.next_token();
 
         // TODO: Skipping the expressions until we encounter a semicolon
         while self.cur_token != Token::Semicolon {
@@ -130,7 +136,9 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression> {
-        let prefix = self.prefix_parse_fn().ok_or(ParserError::Error)?;
+        let prefix = self
+            .prefix_parse_fn()
+            .ok_or_else(|| ParserError::ExpectedPrefixToken(self.cur_token.clone()))?;
         let mut left_exp = prefix(self)?;
         while self.peek_token != Token::Semicolon
             && precedence < self.infix_token(&self.peek_token).0
@@ -162,7 +170,7 @@ impl Parser {
         if let Token::Ident(ident) = &self.cur_token {
             Ok(Expression::Identifier(ident.to_string()))
         } else {
-            Err(ParserError::Error)
+            Err(ParserError::ExpectedIdentifierToken(self.cur_token.clone()))
         }
     }
 
@@ -170,12 +178,10 @@ impl Parser {
         if let Token::Int(int) = &self.cur_token {
             match int.parse() {
                 Ok(value) => Ok(Expression::IntegerLiteral(value)),
-                Err(_) => {
-                    Err(ParserError::ParseInt(int.to_string()))
-                }
+                Err(_) => Err(ParserError::ParseInt(int.to_string())),
             }
         } else {
-            Err(ParserError::Error)
+            Err(ParserError::ExpectedIntegerToken(self.cur_token.clone()))
         }
     }
 
@@ -191,7 +197,11 @@ impl Parser {
         self.next_token();
 
         let exp = self.parse_expression(Precedence::Lowest)?;
-        self.expect_peek(Token::Rparen)?;
+
+        if self.peek_token != Token::Rparen {
+            return Err(ParserError::ExpectedRparen(self.peek_token.clone()));
+        }
+        self.next_token();
 
         Ok(exp)
     }
@@ -200,7 +210,7 @@ impl Parser {
         match &self.cur_token {
             Token::True => Ok(Expression::Boolean(true)),
             Token::False => Ok(Expression::Boolean(false)),
-            _ => Err(ParserError::Error),
+            _ => Err(ParserError::ExpectedBooleanToken(self.cur_token.clone())),
         }
     }
 
@@ -220,7 +230,7 @@ impl Parser {
 
     fn parse_infix_expression(&mut self, left: Expression) -> Result<Expression> {
         let (precedence, infix) = self.infix_token(&self.cur_token);
-        let i = infix.ok_or(ParserError::Error)?;
+        let i = infix.ok_or_else(|| ParserError::ExpectedInfixToken(self.cur_token.clone()))?;
         self.next_token();
         let right = self.parse_expression(precedence)?;
 
@@ -231,7 +241,7 @@ impl Parser {
         match token {
             Token::Bang => Ok(Prefix::Bang),
             Token::Minus => Ok(Prefix::Minus),
-            _ => Err(ParserError::Error),
+            token @ _ => Err(ParserError::ExpectedPrefixToken(token.clone())),
         }
     }
 
@@ -246,15 +256,6 @@ impl Parser {
             Token::Slash => (Precedence::Product, Some(Infix::Slash)),
             Token::Asterisk => (Precedence::Product, Some(Infix::Asterisk)),
             _ => (Precedence::Lowest, None),
-        }
-    }
-
-    fn expect_peek(&mut self, token: Token) -> Result<()> {
-        if self.peek_token == token {
-            self.next_token();
-            Ok(())
-        } else {
-            Err(ParserError::UnexpectedToken(self.peek_token.clone(), token))
         }
     }
 }
