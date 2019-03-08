@@ -182,13 +182,18 @@ impl Parser {
             Token::Minus => Some(Parser::parse_prefix_expression),
             Token::Lparen => Some(Parser::parse_grouped_expression),
             Token::If => Some(Parser::parse_if_expression),
+            Token::Function => Some(Parser::parse_function_literal),
             _ => None,
         }
     }
 
     fn parse_identifier(&mut self) -> Result<Expression> {
+        self.parse_identifier_string().map(Expression::Identifier)
+    }
+
+    fn parse_identifier_string(&self) -> Result<String> {
         if let Token::Ident(ident) = &self.cur_token {
-            Ok(Expression::Identifier(ident.to_string()))
+            Ok(ident.to_string())
         } else {
             Err(ParserError::ExpectedIdentifierToken(self.cur_token.clone()))
         }
@@ -206,42 +211,75 @@ impl Parser {
     }
 
     fn parse_prefix_expression(&mut self) -> Result<Expression> {
+        // cur_token: the prefix token like `!`
         let p = self.prefix_token(&self.cur_token)?;
         self.next_token();
+        // cur_token: the first token of the expression
         let exp = self.parse_expression(Precedence::Prefix)?;
+        // cur_token: the last token of the expression
 
         Ok(Expression::Prefix(p, Box::new(exp)))
     }
 
     fn parse_grouped_expression(&mut self) -> Result<Expression> {
+        // cur_token: (
         self.next_token();
+        // cur_token: the first token of the expression
 
         let exp = self.parse_expression(Precedence::Lowest)?;
+        // cur_token: the last token of the expression
 
         self.expect_peek(Token::Rparen, ParserError::ExpectedRparen)?;
+        // cur_token: )
 
         Ok(exp)
     }
 
     fn parse_if_expression(&mut self) -> Result<Expression> {
+        // cur_token: if
         self.expect_peek(Token::Lparen, ParserError::ExpectedLparen)?;
+        // cur_token: (
 
         self.next_token();
+        // cur_token: condition
         let condition = self.parse_expression(Precedence::Lowest)?;
 
         self.expect_peek(Token::Rparen, ParserError::ExpectedRparen)?;
+        // cur_token: (
         self.expect_peek(Token::Lbrace, ParserError::ExpectedLbrace)?;
+        // cur_token: {
 
         let consequence = self.parse_block_statement()?;
+        // cur_token: }
 
         let mut alternative = None;
         if self.peek_token == Token::Else {
             self.next_token();
+            // cur_token: else
             self.expect_peek(Token::Lbrace, ParserError::ExpectedLbrace)?;
+            // cur_token: {
             alternative = Some(self.parse_block_statement()?);
+            // cur_token: }
         }
 
         Ok(Expression::If(Box::new(condition), consequence, alternative))
+    }
+
+    fn parse_function_literal(&mut self) -> Result<Expression> {
+        // cur_token: fn
+        self.expect_peek(Token::Lparen, ParserError::ExpectedLparen)?;
+        // cur_token: (
+
+        let parameters = self.parse_function_parameters()?;
+        // cur_token: )
+
+        self.expect_peek(Token::Lbrace, ParserError::ExpectedLbrace)?;
+        // cur_token: {
+
+        let body = self.parse_block_statement()?;
+        // cur_token: }
+
+        Ok(Expression::FunctionLiteral(parameters, body))
     }
 
     fn parse_boolean(&mut self) -> Result<Expression> {
@@ -273,6 +311,38 @@ impl Parser {
         let right = self.parse_expression(precedence)?;
 
         Ok(Expression::Infix(i, Box::new(left), Box::new(right)))
+    }
+
+    fn parse_function_parameters(&mut self) -> Result<Vec<String>> {
+        // cur_token: (
+        let mut identifiers = vec![];
+
+        // No parameters
+        if self.peek_token == Token::Rparen {
+            self.next_token();
+            // cur_token: )
+            return Ok(identifiers);
+        }
+
+        self.next_token();
+        // cur_token: the first parameter
+
+        identifiers.push(self.parse_identifier_string()?);
+
+        while self.peek_token == Token::Comma {
+            // cur_token: the previous parameter
+            self.next_token();
+            // cur_token: comma
+            self.next_token();
+            // cur_token: the current parameter
+
+            identifiers.push(self.parse_identifier_string()?);
+        }
+
+        self.expect_peek(Token::Rparen, ParserError::ExpectedRparen)?;
+        // cur_token: )
+
+        Ok(identifiers)
     }
 
     fn prefix_token(&self, token: &Token) -> Result<Prefix> {

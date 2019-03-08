@@ -62,6 +62,7 @@ pub enum Expression {
     Prefix(Prefix, Box<Expression>),
     Infix(Infix, Box<Expression>, Box<Expression>),
     If(Box<Expression>, BlockStatement, Option<BlockStatement>),
+    FunctionLiteral(Vec<String>, BlockStatement),
 }
 
 impl fmt::Display for Expression {
@@ -80,7 +81,10 @@ impl fmt::Display for Expression {
                     write!(f, " else {}", alt)?;
                 }
                 Ok(())
-            }
+            },
+            Expression::FunctionLiteral(parameters, body) => {
+                write!(f, "fn({}) {}", parameters.join(", "), body)
+            },
         }
     }
 }

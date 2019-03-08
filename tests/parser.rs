@@ -192,6 +192,9 @@ mod parser_tests {
             ("!(true == true)", "(!(true == true));"),
             ("if (x < y) { x }", "if (x < y) { x; };"),
             ("if (x < y) { x } else { y }", "if (x < y) { x; } else { y; };"),
+            ("fn() { 3 * 9; }", "fn() { (3 * 9); };"),
+            ("fn(x) { x * 9; }", "fn(x) { (x * 9); };"),
+            ("fn(x, y) { x + y; }", "fn(x, y) { (x + y); };"),
         ];
         for (input, expected) in tests {
             let lexer = Lexer::new(input);
