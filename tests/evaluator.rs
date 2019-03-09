@@ -7,16 +7,12 @@ mod evalator_tests {
     use cymbal::evaluator;
 
     #[test]
-    fn eval() {
-        let tests = [
+    fn eval_boolean() {
+        test_eval(vec![
             // Prefix
             // boolean -> boolean
             ("!true", "false"),
             ("!false", "true"),
-            // integer -> integer
-            ("-123", "-123"),
-            ("-(-123)", "123"),
-            ("-(3 * 3)", "-9"),
 
             // Infix
             // boolean -> boolean
@@ -31,12 +27,39 @@ mod evalator_tests {
             ("2 != 2", "false"),
             ("1 > 2", "false"),
             ("1 < 2", "true"),
-            // integer -> integer
+        ]);
+    }
+
+    #[test]
+    fn eval_integer() {
+        test_eval(vec![
+            // Prefix
+            ("-123", "-123"),
+            ("-(-123)", "123"),
+            ("-(3 * 3)", "-9"),
+
+            // Infix
             ("2 + 3", "5"),
             ("2 - 3", "-1"),
             ("2 * 3", "6"),
             ("9 / 3", "3"),
-        ];
+        ]);
+    }
+
+    #[test]
+    fn eval_if() {
+        test_eval(vec![
+            ("if (true) { 10 }", "10"),
+            ("if (false) { 10 }", "null"),
+            ("if (null) { 1 } else { 2 }", "2"),
+            ("if (2 > 1) { 3 } else { 4 }", "3"),
+            ("if (2 < 1) { 3 } else { 4 }", "4"),
+            ("if (1 < 2) { 3 }", "3"),
+            ("if (1 > 2) { 3 }", "null"),
+        ]);
+    }
+
+    fn test_eval(tests: Vec<(&str, &str)>) {
         for (input, expected) in &tests {
             let lexer = Lexer::new(input);
             let mut parser = Parser::new(lexer);

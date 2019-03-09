@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Infix, Prefix, Program, Statement};
+use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::object::Object;
 
 pub fn eval(program: Program) -> Object {
@@ -26,6 +26,9 @@ fn eval_expression(expression: Expression) -> Object {
         Expression::Boolean(value) => Object::Boolean(value),
         Expression::Prefix(prefix, exp) => eval_prefix_expression(prefix, *exp),
         Expression::Infix(infix, left, right) => eval_infix_expression(infix, *left, *right),
+        Expression::If(condition, consequence, alternative) => {
+            eval_if_expression(*condition, consequence, alternative)
+        }
         _ => Object::Null,
     }
 }
@@ -85,4 +88,30 @@ fn eval_infix_expression(infix: Infix, left_exp: Expression, right_exp: Expressi
             _ => Object::Null,
         },
     }
+}
+
+fn eval_if_expression(
+    condition: Expression,
+    consequence: BlockStatement,
+    alternative: Option<BlockStatement>,
+) -> Object {
+    if is_truthy(eval_expression(condition)) {
+        eval_block_statement(consequence)
+    } else {
+        alternative
+            .map(|a| eval_block_statement(a))
+            .unwrap_or(Object::Null)
+    }
+}
+
+fn is_truthy(obj: Object) -> bool {
+    match obj {
+        Object::Boolean(value) => value,
+        Object::Null => false,
+        _ => true,
+    }
+}
+
+fn eval_block_statement(block: BlockStatement) -> Object {
+    eval_statements(block.statements)
 }
