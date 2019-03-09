@@ -37,10 +37,7 @@ fn eval_prefix_expression(prefix: Prefix, exp: Expression) -> Object {
     let obj = eval_expression(exp);
 
     match prefix {
-        Prefix::Bang => match obj {
-            Object::Boolean(value) => Object::Boolean(!value),
-            _ => Object::Null,
-        },
+        Prefix::Bang => Object::Boolean(!is_truthy(obj)),
         Prefix::Minus => match obj {
             Object::Integer(value) => Object::Integer(-value),
             _ => Object::Null,

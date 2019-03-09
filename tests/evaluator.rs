@@ -10,9 +10,15 @@ mod evalator_tests {
     fn eval_boolean() {
         test_eval(vec![
             // Prefix
-            // boolean -> boolean
             ("!true", "false"),
+            ("!!true", "true"),
             ("!false", "true"),
+            ("!!false", "false"),
+            ("!null", "true"),
+            ("!!null", "false"),
+            ("!0", "false"),
+            ("!3", "false"),
+            ("!!3", "true"),
 
             // Infix
             // boolean -> boolean
