@@ -1,7 +1,7 @@
 extern crate cymbal;
 
 #[cfg(test)]
-mod parser_tests {
+mod evalator_tests {
     use cymbal::lexer::Lexer;
     use cymbal::parser::Parser;
     use cymbal::evaluator;
