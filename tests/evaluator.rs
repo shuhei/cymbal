@@ -98,7 +98,13 @@ mod evalator_tests {
             ("true + false;", "unknown operator: BOOLEAN + BOOLEAN"),
             ("5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"),
             ("if (10 > 1) { true + false; }", "unknown operator: BOOLEAN + BOOLEAN"),
-            ("if (10 > 1) { true + false; }; 8;", "unknown operator: BOOLEAN + BOOLEAN")
+            ("if (10 > 1) { true + false; }; 8;", "unknown operator: BOOLEAN + BOOLEAN"),
+            ("(1 + true) * 4;", "type mismatch: INTEGER + BOOLEAN"),
+            ("3 - (true * 2);", "type mismatch: BOOLEAN * INTEGER"),
+            ("(3 + false) - (true * 2);", "type mismatch: INTEGER + BOOLEAN"),
+            ("!(1 + true);", "type mismatch: INTEGER + BOOLEAN"),
+            ("return (1 + true) * 4;", "type mismatch: INTEGER + BOOLEAN"),
+            ("if (3 == true) { 1 } else { 2 }", "type mismatch: INTEGER == BOOLEAN"),
         ];
         for (input, expected_message) in &tests {
             let result = eval_input(input);

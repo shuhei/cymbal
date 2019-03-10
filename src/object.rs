@@ -31,6 +31,22 @@ impl Object {
             Object::Error(_) => "ERROR",
         }
     }
+
+    // TODO: Use `Result<Object, EvalError>` instead?
+    pub fn is_error(&self) -> bool {
+        match self {
+            Object::Error(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Object::Boolean(value) => *value,
+            Object::Null => false,
+            _ => true,
+        }
+    }
 }
 
 pub enum EvalError {

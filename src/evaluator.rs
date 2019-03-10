@@ -39,7 +39,13 @@ fn eval_block_statement(block: BlockStatement) -> Object {
 fn eval_statement(statement: Statement) -> Object {
     match statement {
         Statement::Expression(exp) => eval_expression(exp),
-        Statement::Return(Some(exp)) => Object::Return(Box::new(eval_expression(exp))),
+        Statement::Return(Some(exp)) => {
+            let result = eval_expression(exp);
+            if result.is_error() {
+                return result;
+            }
+            Object::Return(Box::new(result))
+        }
         Statement::Return(None) => Object::Return(Box::new(Object::Null)),
         _ => Object::Null,
     }
@@ -60,10 +66,13 @@ fn eval_expression(expression: Expression) -> Object {
 
 fn eval_prefix_expression(prefix: Prefix, exp: Expression) -> Object {
     let obj = eval_expression(exp);
+    if obj.is_error() {
+        return obj;
+    }
 
     match prefix {
         // `!` works like JavaScript :P
-        Prefix::Bang => Object::Boolean(!is_truthy(obj)),
+        Prefix::Bang => Object::Boolean(!obj.is_truthy()),
         Prefix::Minus => match obj {
             Object::Integer(value) => Object::Integer(-value),
             _ => Object::Error(Box::new(EvalError::UnknownPrefixOperator(prefix, obj))),
@@ -73,7 +82,14 @@ fn eval_prefix_expression(prefix: Prefix, exp: Expression) -> Object {
 
 fn eval_infix_expression(infix: Infix, left_exp: Expression, right_exp: Expression) -> Object {
     let left_obj = eval_expression(left_exp);
+    if left_obj.is_error() {
+        return left_obj;
+    }
+
     let right_obj = eval_expression(right_exp);
+    if right_obj.is_error() {
+        return right_obj;
+    }
 
     match (left_obj, right_obj) {
         (Object::Boolean(left), Object::Boolean(right)) => {
@@ -116,19 +132,16 @@ fn eval_if_expression(
     consequence: BlockStatement,
     alternative: Option<BlockStatement>,
 ) -> Object {
-    if is_truthy(eval_expression(condition)) {
+    let result = eval_expression(condition);
+    if result.is_error() {
+        return result;
+    }
+
+    if result.is_truthy() {
         eval_block_statement(consequence)
     } else {
         alternative
             .map(|a| eval_block_statement(a))
             .unwrap_or(Object::Null)
-    }
-}
-
-fn is_truthy(obj: Object) -> bool {
-    match obj {
-        Object::Boolean(value) => value,
-        Object::Null => false,
-        _ => true,
     }
 }
