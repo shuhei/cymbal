@@ -5,6 +5,7 @@ mod evalator_tests {
     use cymbal::evaluator;
     use cymbal::lexer::Lexer;
     use cymbal::parser::Parser;
+    use cymbal::object::Object;
 
     #[test]
     fn eval_boolean() {
@@ -88,15 +89,38 @@ mod evalator_tests {
         ]);
     }
 
+    #[test]
+    fn error_handling() {
+        let tests = vec![
+            ("5 + true;", "type mismatch: INTEGER + BOOLEAN"),
+            ("5 + true; 5;", "type mismatch: INTEGER + BOOLEAN"),
+            ("-true", "unknown operator: -BOOLEAN"),
+            ("true + false;", "unknown operator: BOOLEAN + BOOLEAN"),
+            ("5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"),
+            ("if (10 > 1) { true + false; }", "unknown operator: BOOLEAN + BOOLEAN"),
+            ("if (10 > 1) { true + false; }; 8;", "unknown operator: BOOLEAN + BOOLEAN")
+        ];
+        for (input, expected_message) in &tests {
+            let result = eval_input(input);
+            if let Object::Error(eval_error) = result {
+                assert_eq!(&eval_error.to_string(), expected_message, "for {}", input);
+            } else {
+                panic!("no error object returned. got={} for {}", result, input);
+            }
+        }
+    }
+
     fn test_eval(tests: Vec<(&str, &str)>) {
         for (input, expected) in &tests {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
-
-            let program = parser.parse_program();
-            let actual = evaluator::eval(program).to_string();
-
-            assert_eq!(actual, expected.to_string(), "for {}", input);
+            assert_eq!(eval_input(input).to_string(), expected.to_string(), "for {}", input);
         }
+    }
+
+    fn eval_input(input: &str) -> Object {
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+        evaluator::eval(program)
     }
 }
