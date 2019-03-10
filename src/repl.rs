@@ -1,6 +1,7 @@
 use crate::evaluator;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
+use crate::object::Environment;
 use std::io;
 use std::io::Write;
 
@@ -8,6 +9,8 @@ pub fn start() {
     let mut stdout = io::stdout();
     let stdin = io::stdin();
     let mut input = String::new();
+
+    let mut env = Environment::new();
 
     loop {
         print!(">> ");
@@ -17,6 +20,7 @@ pub fn start() {
             .expect("Failed to read line from stdin");
 
         let lexer = Lexer::new(input.trim());
+        input.clear();
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program();
@@ -28,7 +32,8 @@ pub fn start() {
             }
             continue;
         }
-        match evaluator::eval(program) {
+
+        match evaluator::eval(&program, &mut env) {
             Ok(obj) => {
                 println!("{}", obj);
             }
@@ -36,7 +41,5 @@ pub fn start() {
                 println!("ERROR: {}", err);
             }
         }
-
-        input.clear();
     }
 }

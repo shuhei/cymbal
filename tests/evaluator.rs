@@ -4,7 +4,7 @@ extern crate cymbal;
 mod evalator_tests {
     use cymbal::evaluator;
     use cymbal::lexer::Lexer;
-    use cymbal::object::EvalResult;
+    use cymbal::object::{EvalResult, Environment};
     use cymbal::parser::Parser;
 
     #[test]
@@ -120,27 +120,41 @@ mod evalator_tests {
                 "if (3 == true) { 1 } else { 2 }",
                 "type mismatch: INTEGER == BOOLEAN",
             ),
+            ("foobar", "identifier not found: foobar"),
         ];
         for (input, expected_message) in &tests {
             match eval_input(input) {
                 Ok(obj) => {
-                    panic!("no error object returned. got={} for {}", obj, input);
+                    panic!("no error object returned. got=`{}` for `{}`", obj, input);
                 }
                 Err(err) => {
-                    assert_eq!(&err.to_string(), expected_message, "for {}", input);
+                    assert_eq!(&err.to_string(), expected_message, "for `{}`", input);
                 }
             }
         }
+    }
+
+    #[test]
+    fn let_statement() {
+        test_eval(vec![
+            ("let a = 5; a;", "5"),
+            ("let a = 5 * 5; a;", "25"),
+            ("let a = 5; let b = a; b;", "5"),
+            ("let a = 5; let b = a; let c = a + b + 5; c;", "15"),
+        ]);
     }
 
     fn test_eval(tests: Vec<(&str, &str)>) {
         for (input, expected) in &tests {
             match eval_input(input) {
                 Ok(obj) => {
-                    assert_eq!(obj.to_string(), expected.to_string(), "for {}", input);
+                    assert_eq!(obj.to_string(), expected.to_string(), "for `{}`", input);
                 }
                 Err(err) => {
-                    panic!("expected {}, but got error={} for {}", expected, err, input);
+                    panic!(
+                        "expected `{}`, but got error=`{}` for `{}`",
+                        expected, err, input
+                    );
                 }
             }
         }
@@ -151,6 +165,7 @@ mod evalator_tests {
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program();
-        evaluator::eval(program)
+        let mut env = Environment::new();
+        evaluator::eval(&program, &mut env)
     }
 }

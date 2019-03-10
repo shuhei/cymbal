@@ -1,8 +1,10 @@
 use crate::ast::{Infix, Prefix};
+use std::collections::HashMap;
 use std::fmt;
 
 pub type EvalResult = Result<Object, EvalError>;
 
+#[derive(Clone)]
 pub enum Object {
     Integer(i64),
     Boolean(bool),
@@ -44,6 +46,7 @@ pub enum EvalError {
     TypeMismatch(Infix, Object, Object),
     UnknownPrefixOperator(Prefix, Object),
     UnknownInfixOperator(Infix, Object, Object),
+    IdentifierNotFound(String),
 }
 
 impl fmt::Display for EvalError {
@@ -66,6 +69,30 @@ impl fmt::Display for EvalError {
                 infix,
                 right.type_name()
             ),
+            EvalError::IdentifierNotFound(name) => write!(f, "identifier not found: {}", name),
         }
+    }
+}
+
+pub struct Environment {
+    store: HashMap<String, Object>,
+}
+
+impl Environment {
+    pub fn new() -> Self {
+        let mut env = Environment {
+            store: HashMap::new(),
+        };
+        // Should `null` be a reserved word?
+        env.set("null", Object::Null);
+        env
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Object> {
+        self.store.get(name)
+    }
+
+    pub fn set(&mut self, name: &str, val: Object) {
+        self.store.insert(name.to_string(), val);
     }
 }
