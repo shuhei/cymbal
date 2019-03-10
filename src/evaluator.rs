@@ -2,15 +2,11 @@ use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::object::Object;
 
 pub fn eval(program: Program) -> Object {
-    eval_statements(program.statements)
-}
-
-fn eval_statements(statements: Vec<Statement>) -> Object {
     let mut result = Object::Null;
-    for statement in statements {
+    for statement in program.statements {
         result = eval_statement(statement);
 
-        // Stop evaluation if there is `return`.
+        // Stop evaluation and unwrap the return value if there is `return`.
         if let Object::Return(value) = result {
             return *value;
         }
@@ -117,5 +113,14 @@ fn is_truthy(obj: Object) -> bool {
 }
 
 fn eval_block_statement(block: BlockStatement) -> Object {
-    eval_statements(block.statements)
+    let mut result = Object::Null;
+    for statement in block.statements {
+        result = eval_statement(statement);
+
+        // Stop evaluation if there is `return`. Keep the `return` wrapper.
+        if let Object::Return(value) = result {
+            return Object::Return(value);
+        }
+    }
+    result
 }

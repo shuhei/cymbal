@@ -78,6 +78,13 @@ mod evalator_tests {
             ("1 + 2; return; 3 + 4", "null"),
             ("1 + 2; return 8; 3 + 4", "8"),
             ("3; return 8 * 2; 3 + 4", "16"),
+            // Nested statements
+            ("if (10 > 1) {
+                if (10 > 1) {
+                    return 10;
+                }
+                return 1;
+            }", "10"),
         ]);
     }
 
