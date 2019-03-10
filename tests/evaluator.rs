@@ -169,12 +169,15 @@ mod evalator_tests {
 
     #[test]
     fn closure() {
-        test_eval(vec![
-            (
-                "let newAdder = fn(x) { fn(y) { x + y } }; let addTwo = newAdder(2); addTwo(3);",
-                "5",
-            ),
-        ]);
+        test_eval(vec![(
+            "let newAdder = fn(x) { fn(y) { x + y } }; let addTwo = newAdder(2); addTwo(3);",
+            "5",
+        )]);
+    }
+
+    #[test]
+    fn string_literal() {
+        test_eval(vec![("\"Hello, World!\"", "\"Hello, World!\"")]);
     }
 
     fn test_eval(tests: Vec<(&str, &str)>) {

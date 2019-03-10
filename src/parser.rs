@@ -22,6 +22,7 @@ pub enum ParserError {
     ExpectedIdentifierToken(Token),
     ExpectedBooleanToken(Token),
     ExpectedIntegerToken(Token),
+    ExpectedStringToken(Token),
     ExpectedLparen(Token),
     ExpectedRparen(Token),
     ExpectedLbrace(Token),
@@ -194,6 +195,7 @@ impl Parser {
         match &self.cur_token {
             Token::Ident(_) => Some(Parser::parse_identifier),
             Token::Int(_) => Some(Parser::parse_integer_literal),
+            Token::String(_) => Some(Parser::parse_string_literal),
             Token::True => Some(Parser::parse_boolean),
             Token::False => Some(Parser::parse_boolean),
             Token::Bang => Some(Parser::parse_prefix_expression),
@@ -225,6 +227,14 @@ impl Parser {
             }
         } else {
             Err(ParserError::ExpectedIntegerToken(self.cur_token.clone()))
+        }
+    }
+
+    fn parse_string_literal(&mut self) -> Result<Expression> {
+        if let Token::String(s) = &self.cur_token {
+            Ok(Expression::StringLiteral(s.to_string()))
+        } else {
+            Err(ParserError::ExpectedStringToken(self.cur_token.clone()))
         }
     }
 

@@ -224,7 +224,9 @@ mod parser_tests {
             ("add(a + b + c * d / f + g)", "add((((a + b) + ((c * d) / f)) + g));"),
             ("fn(x, y) { x + y; }(3, 4)", "fn(x, y) { (x + y); }(3, 4);"),
             ("let x = 3", "let x = 3;"),
-            ("let x = 3 + f * 8;", "let x = (3 + (f * 8));")
+            ("let x = 3 + f * 8;", "let x = (3 + (f * 8));"),
+            ("\"hello world\"", "\"hello world\";"),
+            ("let s = \"hello world\"", "let s = \"hello world\";")
         ];
         for (input, expected) in tests {
             let lexer = Lexer::new(input);
@@ -239,12 +241,12 @@ mod parser_tests {
 
     fn check_parser_errors(parser: &Parser) {
         let errors = parser.errors();
-        assert_eq!(
-            errors.len(),
-            0,
-            "For input '{}', got parser errors: {:?}",
-            parser.input(),
-            errors
-        );
+        if errors.len() > 0 {
+            panic!(
+                "for input '{}', got parser errors: {:?}",
+                parser.input(),
+                errors
+            );
+        }
     }
 }

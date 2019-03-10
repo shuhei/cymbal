@@ -8,8 +8,9 @@ pub type EvalResult = Result<Object, EvalError>;
 
 #[derive(Clone)]
 pub enum Object {
-    Integer(i64),
     Boolean(bool),
+    Integer(i64),
+    String(String),
     Null,
     Return(Box<Object>),
     Function(Vec<String>, BlockStatement, Rc<RefCell<Environment>>),
@@ -18,8 +19,9 @@ pub enum Object {
 impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Object::Integer(value) => write!(f, "{}", value),
             Object::Boolean(value) => write!(f, "{}", value),
+            Object::Integer(value) => write!(f, "{}", value),
+            Object::String(value) => write!(f, "\"{}\"", value),
             Object::Null => write!(f, "null"),
             Object::Return(value) => write!(f, "{}", *value),
             Object::Function(params, body, _) => {
@@ -32,8 +34,9 @@ impl fmt::Display for Object {
 impl Object {
     pub fn type_name(&self) -> &str {
         match self {
-            Object::Integer(_) => "INTEGER",
             Object::Boolean(_) => "BOOLEAN",
+            Object::Integer(_) => "INTEGER",
+            Object::String(_) => "STRING",
             Object::Null => "NULL",
             Object::Return(_) => "RETURN",
             Object::Function(_, _, _) => "FUNCTION",

@@ -55,6 +55,7 @@ fn eval_statement(statement: &Statement, env: Rc<RefCell<Environment>>) -> EvalR
 fn eval_expression(expression: &Expression, env: Rc<RefCell<Environment>>) -> EvalResult {
     match expression {
         Expression::IntegerLiteral(int) => Ok(Object::Integer(*int)),
+        Expression::StringLiteral(s) => Ok(Object::String(s.to_string())),
         Expression::Boolean(value) => Ok(Object::Boolean(*value)),
         Expression::Prefix(prefix, exp) => eval_prefix_expression(prefix, exp.as_ref(), env),
         Expression::Infix(infix, left, right) => {
