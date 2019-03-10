@@ -9,6 +9,11 @@ fn eval_statements(statements: Vec<Statement>) -> Object {
     let mut result = Object::Null;
     for statement in statements {
         result = eval_statement(statement);
+
+        // Stop evaluation if there is `return`.
+        if let Object::Return(value) = result {
+            return *value;
+        }
     }
     result
 }
@@ -16,6 +21,8 @@ fn eval_statements(statements: Vec<Statement>) -> Object {
 fn eval_statement(statement: Statement) -> Object {
     match statement {
         Statement::Expression(exp) => eval_expression(exp),
+        Statement::Return(Some(exp)) => Object::Return(Box::new(eval_expression(exp))),
+        Statement::Return(None) => Object::Return(Box::new(Object::Null)),
         _ => Object::Null,
     }
 }

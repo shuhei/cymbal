@@ -2,9 +2,9 @@ extern crate cymbal;
 
 #[cfg(test)]
 mod evalator_tests {
+    use cymbal::evaluator;
     use cymbal::lexer::Lexer;
     use cymbal::parser::Parser;
-    use cymbal::evaluator;
 
     #[test]
     fn eval_boolean() {
@@ -19,7 +19,6 @@ mod evalator_tests {
             ("!0", "false"),
             ("!3", "false"),
             ("!!3", "true"),
-
             // Infix
             // boolean -> boolean
             ("true == true", "true"),
@@ -43,13 +42,11 @@ mod evalator_tests {
             ("-123", "-123"),
             ("-(-123)", "123"),
             ("-(3 * 3)", "-9"),
-
             // Infix
             ("2 + 3", "5"),
             ("2 - 3", "-1"),
             ("2 * 3", "6"),
             ("9 / 3", "3"),
-
             ("-50 + 100 + -50", "0"),
             ("20 + 2 * -10", "0"),
             ("50 / 2 * 2 + 10", "60"),
@@ -70,6 +67,17 @@ mod evalator_tests {
             ("if (2 < 1) { 3 } else { 4 }", "4"),
             ("if (1 < 2) { 3 }", "3"),
             ("if (1 > 2) { 3 }", "null"),
+        ]);
+    }
+
+    #[test]
+    fn eval_return() {
+        test_eval(vec![
+            ("return;", "null"),
+            ("return 10;", "10"),
+            ("1 + 2; return; 3 + 4", "null"),
+            ("1 + 2; return 8; 3 + 4", "8"),
+            ("3; return 8 * 2; 3 + 4", "16"),
         ]);
     }
 
