@@ -163,6 +163,17 @@ mod evalator_tests {
                 "40",
             ),
             ("fn(x) { x; }(5);", "5"),
+            ("fn(x) { x; }(1); 5;", "5"),
+        ]);
+    }
+
+    #[test]
+    fn closure() {
+        test_eval(vec![
+            (
+                "let newAdder = fn(x) { fn(y) { x + y } }; let addTwo = newAdder(2); addTwo(3);",
+                "5",
+            ),
         ]);
     }
 
