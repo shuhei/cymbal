@@ -84,6 +84,9 @@ impl Lexer {
             '}' => {
                 tok = Token::Rbrace;
             }
+            '"' => {
+                tok = Token::String(self.read_string().to_string());
+            }
             '\u{0}' => {
                 tok = Token::Eof;
             }
@@ -92,7 +95,7 @@ impl Lexer {
                     let ident = self.read_identifier();
                     return token::lookup_ident(ident);
                 } else if is_digit(self.ch) {
-                    return Token::Int(self.read_number().to_owned());
+                    return Token::Int(self.read_number().to_string());
                 } else {
                     tok = Token::Illegal
                 }
@@ -127,6 +130,19 @@ impl Lexer {
         let position = self.position;
         while is_digit(self.ch) {
             self.read_char();
+        }
+        &self.input[position..self.position]
+    }
+
+    fn read_string(&mut self) -> &str {
+        let position = self.position + 1;
+        loop {
+            self.read_char();
+            // TODO: Return an error when it reaches EOF.
+            // TODO: Support escaping like `\"`, `\n`, `\t`, etc.
+            if self.ch == '"' || self.ch == '\u{0}' {
+                break;
+            }
         }
         &self.input[position..self.position]
     }

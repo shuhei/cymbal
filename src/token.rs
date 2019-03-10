@@ -6,8 +6,9 @@ pub enum Token {
     Eof,
 
     // Identifiers + literals
-    Ident(String), // add, foobar, x, y, ...
-    Int(String),   // 123456
+    Ident(String),  // add, foobar, x, y, ...
+    Int(String),    // 123456
+    String(String), // "hello"
 
     // Operators
     Assign,
@@ -48,6 +49,8 @@ impl fmt::Display for Token {
 
             Token::Ident(ident) => write!(f, "{}", ident),
             Token::Int(int) => write!(f, "{}", int),
+            // TODO: Escape `"` in a string as `\"`...
+            Token::String(s) => write!(f, "\"{}\"", s),
 
             Token::Assign => write!(f, "="),
             Token::Plus => write!(f, "+"),

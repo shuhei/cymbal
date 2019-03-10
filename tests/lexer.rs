@@ -7,7 +7,7 @@ mod lexer_tests {
 
     #[test]
     fn next_token() {
-        let input = "let five = 5;
+        let input = r#"let five = 5;
             let ten = 10;
 
             let add = fn(x, y) {
@@ -26,7 +26,9 @@ mod lexer_tests {
 
             10 == 10;
             10 != 9;
-        ";
+            "foobar"
+            "foo bar"
+        "#;
 
         let tests = [
             Token::Let,
@@ -102,6 +104,8 @@ mod lexer_tests {
             Token::NotEq,
             Token::Int("9".to_string()),
             Token::Semicolon,
+            Token::String("foobar".to_string()),
+            Token::String("foo bar".to_string()),
             Token::Eof,
         ];
 
