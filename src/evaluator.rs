@@ -1,11 +1,13 @@
 use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::object::{Environment, EvalError, EvalResult, Object};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // Evaluate a program
-pub fn eval(program: &Program, env: &mut Environment) -> EvalResult {
+pub fn eval(program: &Program, env: Rc<RefCell<Environment>>) -> EvalResult {
     let mut result = Object::Null;
     for statement in &program.statements {
-        result = eval_statement(statement, env)?;
+        result = eval_statement(statement, Rc::clone(&env))?;
 
         // Stop evaluation if return
         match result {
@@ -19,10 +21,10 @@ pub fn eval(program: &Program, env: &mut Environment) -> EvalResult {
     Ok(result)
 }
 
-fn eval_block_statement(block: &BlockStatement, env: &mut Environment) -> EvalResult {
+fn eval_block_statement(block: &BlockStatement, env: Rc<RefCell<Environment>>) -> EvalResult {
     let mut result = Object::Null;
     for statement in &block.statements {
-        result = eval_statement(statement, env)?;
+        result = eval_statement(statement, Rc::clone(&env))?;
 
         // Stop evaluation if return
         if let Object::Return(_) = result {
@@ -33,7 +35,7 @@ fn eval_block_statement(block: &BlockStatement, env: &mut Environment) -> EvalRe
     Ok(result)
 }
 
-fn eval_statement(statement: &Statement, env: &mut Environment) -> EvalResult {
+fn eval_statement(statement: &Statement, env: Rc<RefCell<Environment>>) -> EvalResult {
     match statement {
         Statement::Expression(exp) => eval_expression(exp, env),
         Statement::Return(Some(exp)) => {
@@ -42,16 +44,15 @@ fn eval_statement(statement: &Statement, env: &mut Environment) -> EvalResult {
         }
         Statement::Return(None) => Ok(Object::Return(Box::new(Object::Null))),
         Statement::Let(name, exp) => {
-            let result = eval_expression(exp, env)?;
+            let result = eval_expression(exp, Rc::clone(&env))?;
             // TODO: Is this `clone()` the right way to do?
-            // Not sure which of `env` and the returned value will live longer...
-            env.set(name, result.clone());
+            env.borrow_mut().set(name, result.clone());
             Ok(result)
         }
     }
 }
 
-fn eval_expression(expression: &Expression, env: &mut Environment) -> EvalResult {
+fn eval_expression(expression: &Expression, env: Rc<RefCell<Environment>>) -> EvalResult {
     match expression {
         Expression::IntegerLiteral(int) => Ok(Object::Integer(*int)),
         Expression::Boolean(value) => Ok(Object::Boolean(*value)),
@@ -67,11 +68,35 @@ fn eval_expression(expression: &Expression, env: &mut Environment) -> EvalResult
             // TODO: Pass a mutable reference of env...
             Ok(Object::Function(params.to_vec(), body.clone(), env.clone()))
         }
-        _ => Ok(Object::Null),
+        Expression::Call(func, args) => {
+            let function = eval_expression(func, Rc::clone(&env))?;
+            let arguments = eval_expressions(args, env)?;
+            apply_function(function, arguments)
+        }
     }
 }
 
-fn eval_prefix_expression(prefix: &Prefix, exp: &Expression, env: &mut Environment) -> EvalResult {
+fn apply_function(function: Object, arguments: Vec<Object>) -> EvalResult {
+    if let Object::Function(params, body, env) = function {
+        let new_env = Rc::new(RefCell::new(Environment::extend(env)));
+        for (i, param) in params.iter().enumerate() {
+            // TODO: Check the number of arguments?
+            let arg = arguments.get(i).unwrap_or(&Object::Null);
+            new_env.borrow_mut().set(param, arg.clone());
+        }
+
+        let result = eval_block_statement(&body, new_env)?;
+        // Unwrap the returned value.
+        match result {
+            Object::Return(value) => Ok(*value),
+            _ => Ok(result),
+        }
+    } else {
+        Err(EvalError::NotFunction(function.clone()))
+    }
+}
+
+fn eval_prefix_expression(prefix: &Prefix, exp: &Expression, env: Rc<RefCell<Environment>>) -> EvalResult {
     let obj = eval_expression(exp, env)?;
 
     match prefix {
@@ -88,9 +113,9 @@ fn eval_infix_expression(
     infix: &Infix,
     left_exp: &Expression,
     right_exp: &Expression,
-    env: &mut Environment,
+    env: Rc<RefCell<Environment>>,
 ) -> EvalResult {
-    let left_obj = eval_expression(left_exp, env)?;
+    let left_obj = eval_expression(left_exp, Rc::clone(&env))?;
     let right_obj = eval_expression(right_exp, env)?;
 
     match (left_obj, right_obj) {
@@ -133,9 +158,9 @@ fn eval_if_expression(
     condition: &Expression,
     consequence: &BlockStatement,
     alternative: &Option<&BlockStatement>,
-    env: &mut Environment,
+    env: Rc<RefCell<Environment>>,
 ) -> EvalResult {
-    let result = eval_expression(condition, env)?;
+    let result = eval_expression(condition, Rc::clone(&env))?;
 
     if result.is_truthy() {
         eval_block_statement(consequence, env)
@@ -146,9 +171,20 @@ fn eval_if_expression(
     }
 }
 
-fn eval_identifier(name: &str, env: &Environment) -> EvalResult {
-    match env.get(name) {
+fn eval_identifier(name: &str, env: Rc<RefCell<Environment>>) -> EvalResult {
+    match env.borrow().get(name) {
         Some(obj) => Ok(obj.clone()),
         None => Err(EvalError::IdentifierNotFound(name.to_string())),
     }
+}
+
+fn eval_expressions(
+    exps: &Vec<Expression>,
+    env: Rc<RefCell<Environment>>,
+) -> Result<Vec<Object>, EvalError> {
+    let mut results = vec![];
+    for exp in exps {
+        results.push(eval_expression(exp, Rc::clone(&env))?);
+    }
+    Ok(results)
 }

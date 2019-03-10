@@ -1,16 +1,18 @@
 use crate::evaluator;
 use crate::lexer::Lexer;
-use crate::parser::Parser;
 use crate::object::Environment;
+use crate::parser::Parser;
+use std::cell::RefCell;
 use std::io;
 use std::io::Write;
+use std::rc::Rc;
 
 pub fn start() {
     let mut stdout = io::stdout();
     let stdin = io::stdin();
     let mut input = String::new();
 
-    let mut env = Environment::new();
+    let env = Rc::new(RefCell::new(Environment::new()));
 
     loop {
         print!(">> ");
@@ -33,7 +35,7 @@ pub fn start() {
             continue;
         }
 
-        match evaluator::eval(&program, &mut env) {
+        match evaluator::eval(&program, Rc::clone(&env)) {
             Ok(obj) => {
                 println!("{}", obj);
             }

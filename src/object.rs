@@ -1,6 +1,8 @@
 use crate::ast::{BlockStatement, Infix, Prefix};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
 
 pub type EvalResult = Result<Object, EvalError>;
 
@@ -10,7 +12,7 @@ pub enum Object {
     Boolean(bool),
     Null,
     Return(Box<Object>),
-    Function(Vec<String>, BlockStatement, Environment),
+    Function(Vec<String>, BlockStatement, Rc<RefCell<Environment>>),
 }
 
 impl fmt::Display for Object {
@@ -52,6 +54,7 @@ pub enum EvalError {
     UnknownPrefixOperator(Prefix, Object),
     UnknownInfixOperator(Infix, Object, Object),
     IdentifierNotFound(String),
+    NotFunction(Object),
 }
 
 impl fmt::Display for EvalError {
@@ -75,28 +78,39 @@ impl fmt::Display for EvalError {
                 right.type_name()
             ),
             EvalError::IdentifierNotFound(name) => write!(f, "identifier not found: {}", name),
+            EvalError::NotFunction(obj) => write!(f, "not a function: {}", obj.type_name()),
         }
     }
 }
 
-// TODO: Delete this Clone.
-#[derive(Clone)]
 pub struct Environment {
     store: HashMap<String, Object>,
+    outer: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
     pub fn new() -> Self {
         let mut env = Environment {
             store: HashMap::new(),
+            outer: None,
         };
-        // Should `null` be a reserved word?
+        // TODO: Should `null` be a reserved word?
         env.set("null", Object::Null);
         env
     }
 
-    pub fn get(&self, name: &str) -> Option<&Object> {
-        self.store.get(name)
+    pub fn extend(outer: Rc<RefCell<Self>>) -> Environment {
+        Environment {
+            store: HashMap::new(),
+            outer: Some(outer),
+        }
+    }
+
+    pub fn get(&self, name: &str) -> Option<Object> {
+        match self.store.get(name) {
+            Some(value) => Some(value.clone()),
+            None => self.outer.as_ref().and_then(|o| o.borrow().get(name).clone()),
+        }
     }
 
     pub fn set(&mut self, name: &str, val: Object) {

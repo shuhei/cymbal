@@ -4,8 +4,10 @@ extern crate cymbal;
 mod evalator_tests {
     use cymbal::evaluator;
     use cymbal::lexer::Lexer;
-    use cymbal::object::{EvalResult, Environment};
+    use cymbal::object::{Environment, EvalResult};
     use cymbal::parser::Parser;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     #[test]
     fn eval_boolean() {
@@ -146,8 +148,21 @@ mod evalator_tests {
 
     #[test]
     fn function_object() {
+        test_eval(vec![("fn(x) { x + 2; }", "fn(x) {\n{ (x + 2); }\n}")]);
+    }
+
+    #[test]
+    fn function_application() {
         test_eval(vec![
-          ("fn(x) { x + 2; }", "fn(x) {\n{ (x + 2); }\n}")
+            ("let identity = fn(x) { x; }; identity(5);", "5"),
+            ("let identity = fn(x) { return x; }; identity(5);", "5"),
+            ("let double = fn(x) { x * 2; }; double(5);", "10"),
+            ("let add = fn(x, y) { x + y; }; add(10, 23);", "33"),
+            (
+                "let add = fn(x, y) { x + y; }; add(3 + 4, add(10, 23));",
+                "40",
+            ),
+            ("fn(x) { x; }(5);", "5"),
         ]);
     }
 
@@ -172,7 +187,7 @@ mod evalator_tests {
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program();
-        let mut env = Environment::new();
-        evaluator::eval(&program, &mut env)
+        let env = Rc::new(RefCell::new(Environment::new()));
+        evaluator::eval(&program, env)
     }
 }
