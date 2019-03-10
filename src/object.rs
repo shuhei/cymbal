@@ -1,12 +1,13 @@
 use crate::ast::{Infix, Prefix};
 use std::fmt;
 
+pub type EvalResult = Result<Object, EvalError>;
+
 pub enum Object {
     Integer(i64),
     Boolean(bool),
     Null,
     Return(Box<Object>),
-    Error(Box<EvalError>),
 }
 
 impl fmt::Display for Object {
@@ -16,7 +17,6 @@ impl fmt::Display for Object {
             Object::Boolean(value) => write!(f, "{}", value),
             Object::Null => write!(f, "null"),
             Object::Return(value) => write!(f, "{}", *value),
-            Object::Error(message) => write!(f, "ERROR: {}", message),
         }
     }
 }
@@ -28,15 +28,6 @@ impl Object {
             Object::Boolean(_) => "BOOLEAN",
             Object::Null => "NULL",
             Object::Return(_) => "RETURN",
-            Object::Error(_) => "ERROR",
-        }
-    }
-
-    // TODO: Use `Result<Object, EvalError>` instead?
-    pub fn is_error(&self) -> bool {
-        match self {
-            Object::Error(_) => true,
-            _ => false,
         }
     }
 

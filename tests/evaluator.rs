@@ -4,8 +4,8 @@ extern crate cymbal;
 mod evalator_tests {
     use cymbal::evaluator;
     use cymbal::lexer::Lexer;
+    use cymbal::object::EvalResult;
     use cymbal::parser::Parser;
-    use cymbal::object::Object;
 
     #[test]
     fn eval_boolean() {
@@ -80,12 +80,15 @@ mod evalator_tests {
             ("1 + 2; return 8; 3 + 4", "8"),
             ("3; return 8 * 2; 3 + 4", "16"),
             // Nested statements
-            ("if (10 > 1) {
+            (
+                "if (10 > 1) {
                 if (10 > 1) {
                     return 10;
                 }
                 return 1;
-            }", "10"),
+            }",
+                "10",
+            ),
         ]);
     }
 
@@ -97,32 +100,53 @@ mod evalator_tests {
             ("-true", "unknown operator: -BOOLEAN"),
             ("true + false;", "unknown operator: BOOLEAN + BOOLEAN"),
             ("5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"),
-            ("if (10 > 1) { true + false; }", "unknown operator: BOOLEAN + BOOLEAN"),
-            ("if (10 > 1) { true + false; }; 8;", "unknown operator: BOOLEAN + BOOLEAN"),
+            (
+                "if (10 > 1) { true + false; }",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+            (
+                "if (10 > 1) { true + false; }; 8;",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
             ("(1 + true) * 4;", "type mismatch: INTEGER + BOOLEAN"),
             ("3 - (true * 2);", "type mismatch: BOOLEAN * INTEGER"),
-            ("(3 + false) - (true * 2);", "type mismatch: INTEGER + BOOLEAN"),
+            (
+                "(3 + false) - (true * 2);",
+                "type mismatch: INTEGER + BOOLEAN",
+            ),
             ("!(1 + true);", "type mismatch: INTEGER + BOOLEAN"),
             ("return (1 + true) * 4;", "type mismatch: INTEGER + BOOLEAN"),
-            ("if (3 == true) { 1 } else { 2 }", "type mismatch: INTEGER == BOOLEAN"),
+            (
+                "if (3 == true) { 1 } else { 2 }",
+                "type mismatch: INTEGER == BOOLEAN",
+            ),
         ];
         for (input, expected_message) in &tests {
-            let result = eval_input(input);
-            if let Object::Error(eval_error) = result {
-                assert_eq!(&eval_error.to_string(), expected_message, "for {}", input);
-            } else {
-                panic!("no error object returned. got={} for {}", result, input);
+            match eval_input(input) {
+                Ok(obj) => {
+                    panic!("no error object returned. got={} for {}", obj, input);
+                }
+                Err(err) => {
+                    assert_eq!(&err.to_string(), expected_message, "for {}", input);
+                }
             }
         }
     }
 
     fn test_eval(tests: Vec<(&str, &str)>) {
         for (input, expected) in &tests {
-            assert_eq!(eval_input(input).to_string(), expected.to_string(), "for {}", input);
+            match eval_input(input) {
+                Ok(obj) => {
+                    assert_eq!(obj.to_string(), expected.to_string(), "for {}", input);
+                }
+                Err(err) => {
+                    panic!("expected {}, but got error={} for {}", expected, err, input);
+                }
+            }
         }
     }
 
-    fn eval_input(input: &str) -> Object {
+    fn eval_input(input: &str) -> EvalResult {
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
 

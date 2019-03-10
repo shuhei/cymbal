@@ -28,7 +28,14 @@ pub fn start() {
             }
             continue;
         }
-        println!("{}", evaluator::eval(program));
+        match evaluator::eval(program) {
+            Ok(obj) => {
+                println!("{}", obj);
+            }
+            Err(err) => {
+                println!("ERROR: {}", err);
+            }
+        }
 
         input.clear();
     }
