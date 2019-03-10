@@ -63,6 +63,10 @@ fn eval_expression(expression: &Expression, env: &mut Environment) -> EvalResult
             eval_if_expression(condition.as_ref(), consequence, &alternative.as_ref(), env)
         }
         Expression::Identifier(name) => eval_identifier(name, env),
+        Expression::FunctionLiteral(params, body) => {
+            // TODO: Pass a mutable reference of env...
+            Ok(Object::Function(params.to_vec(), body.clone(), env.clone()))
+        }
         _ => Ok(Object::Null),
     }
 }

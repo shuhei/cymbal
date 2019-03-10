@@ -144,6 +144,13 @@ mod evalator_tests {
         ]);
     }
 
+    #[test]
+    fn function_object() {
+        test_eval(vec![
+          ("fn(x) { x + 2; }", "fn(x) {\n{ (x + 2); }\n}")
+        ]);
+    }
+
     fn test_eval(tests: Vec<(&str, &str)>) {
         for (input, expected) in &tests {
             match eval_input(input) {

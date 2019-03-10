@@ -1,4 +1,4 @@
-use crate::ast::{Infix, Prefix};
+use crate::ast::{BlockStatement, Infix, Prefix};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -10,6 +10,7 @@ pub enum Object {
     Boolean(bool),
     Null,
     Return(Box<Object>),
+    Function(Vec<String>, BlockStatement, Environment),
 }
 
 impl fmt::Display for Object {
@@ -19,6 +20,9 @@ impl fmt::Display for Object {
             Object::Boolean(value) => write!(f, "{}", value),
             Object::Null => write!(f, "null"),
             Object::Return(value) => write!(f, "{}", *value),
+            Object::Function(params, body, _) => {
+                write!(f, "fn({}) {{\n{}\n}}", params.join(", "), body)
+            }
         }
     }
 }
@@ -30,6 +34,7 @@ impl Object {
             Object::Boolean(_) => "BOOLEAN",
             Object::Null => "NULL",
             Object::Return(_) => "RETURN",
+            Object::Function(_, _, _) => "FUNCTION",
         }
     }
 
@@ -74,6 +79,8 @@ impl fmt::Display for EvalError {
     }
 }
 
+// TODO: Delete this Clone.
+#[derive(Clone)]
 pub struct Environment {
     store: HashMap<String, Object>,
 }
