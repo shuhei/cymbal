@@ -79,9 +79,15 @@ fn eval_expression(expression: &Expression, env: Rc<RefCell<Environment>>) -> Ev
 
 fn apply_function(function: Object, arguments: Vec<Object>) -> EvalResult {
     if let Object::Function(params, body, env) = function {
+        if params.len() != arguments.len() {
+            return Err(EvalError::WrongArgumentCount {
+                expected: params.len(),
+                given: arguments.len(),
+            });
+        }
+
         let new_env = Rc::new(RefCell::new(Environment::extend(env)));
         for (i, param) in params.iter().enumerate() {
-            // TODO: Check the number of arguments?
             let arg = arguments.get(i).unwrap_or(&Object::Null);
             new_env.borrow_mut().set(param, arg.clone());
         }

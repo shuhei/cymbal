@@ -58,6 +58,7 @@ pub enum EvalError {
     UnknownInfixOperator(Infix, Object, Object),
     IdentifierNotFound(String),
     NotFunction(Object),
+    WrongArgumentCount { expected: usize, given: usize },
 }
 
 impl fmt::Display for EvalError {
@@ -82,6 +83,11 @@ impl fmt::Display for EvalError {
             ),
             EvalError::IdentifierNotFound(name) => write!(f, "identifier not found: {}", name),
             EvalError::NotFunction(obj) => write!(f, "not a function: {}", obj.type_name()),
+            EvalError::WrongArgumentCount { expected, given } => write!(
+                f,
+                "wrong number of arguments: expected {}, given {}",
+                expected, given
+            ),
         }
     }
 }
@@ -112,7 +118,10 @@ impl Environment {
     pub fn get(&self, name: &str) -> Option<Object> {
         match self.store.get(name) {
             Some(value) => Some(value.clone()),
-            None => self.outer.as_ref().and_then(|o| o.borrow().get(name).clone()),
+            None => self
+                .outer
+                .as_ref()
+                .and_then(|o| o.borrow().get(name).clone()),
         }
     }
 

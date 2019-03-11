@@ -124,6 +124,7 @@ mod evalator_tests {
             ),
             ("foobar", "identifier not found: foobar"),
             (r#""hello world" - "hello""#, "unknown operator: STRING - STRING"),
+            ("let add = fn(x, y) { x + y }; add(123); 3;", "wrong number of arguments: expected 2, given 1"),
         ];
         for (input, expected_message) in &tests {
             match eval_input(input) {
