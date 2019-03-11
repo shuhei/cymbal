@@ -97,7 +97,11 @@ fn apply_function(function: Object, arguments: Vec<Object>) -> EvalResult {
     }
 }
 
-fn eval_prefix_expression(prefix: &Prefix, exp: &Expression, env: Rc<RefCell<Environment>>) -> EvalResult {
+fn eval_prefix_expression(
+    prefix: &Prefix,
+    exp: &Expression,
+    env: Rc<RefCell<Environment>>,
+) -> EvalResult {
     let obj = eval_expression(exp, env)?;
 
     match prefix {
@@ -126,6 +130,9 @@ fn eval_infix_expression(
         (Object::Integer(left), Object::Integer(right)) => {
             eval_integer_infix_expression(infix, left, right)
         }
+        (Object::String(left), Object::String(right)) => {
+            eval_string_infix_expression(infix, &left, &right)
+        }
         (left, right) => Err(EvalError::TypeMismatch(infix.clone(), left, right)),
     }
 }
@@ -153,6 +160,19 @@ fn eval_integer_infix_expression(infix: &Infix, left: i64, right: i64) -> EvalRe
         Infix::Asterisk => Object::Integer(left * right),
         Infix::Slash => Object::Integer(left / right),
     })
+}
+
+fn eval_string_infix_expression(infix: &Infix, left: &str, right: &str) -> EvalResult {
+    match infix {
+        // `concat()` seems to be kind of fast...
+        // https://github.com/hoodie/concatenation_benchmarks-rs
+        Infix::Plus => Ok(Object::String([left, right].concat())),
+        _ => Err(EvalError::UnknownInfixOperator(
+            infix.clone(),
+            Object::String(left.to_string()),
+            Object::String(right.to_string()),
+        )),
+    }
 }
 
 fn eval_if_expression(

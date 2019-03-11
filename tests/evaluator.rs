@@ -123,6 +123,7 @@ mod evalator_tests {
                 "type mismatch: INTEGER == BOOLEAN",
             ),
             ("foobar", "identifier not found: foobar"),
+            (r#""hello world" - "hello""#, "unknown operator: STRING - STRING"),
         ];
         for (input, expected_message) in &tests {
             match eval_input(input) {
@@ -176,8 +177,11 @@ mod evalator_tests {
     }
 
     #[test]
-    fn string_literal() {
-        test_eval(vec![("\"Hello, World!\"", "\"Hello, World!\"")]);
+    fn string() {
+        test_eval(vec![
+            (r#""Hello, World!""#, r#""Hello, World!""#),
+            (r#""hello" + " " + "world""#, r#""hello world""#),
+        ]);
     }
 
     fn test_eval(tests: Vec<(&str, &str)>) {
