@@ -31,6 +31,8 @@ pub enum Token {
     Rparen,
     Lbrace,
     Rbrace,
+    Lbracket,
+    Rbracket,
 
     Function,
     Let,
@@ -72,6 +74,8 @@ impl fmt::Display for Token {
             Token::Rparen => write!(f, ")"),
             Token::Lbrace => write!(f, "{{"),
             Token::Rbrace => write!(f, "}}"),
+            Token::Lbracket => write!(f, "["),
+            Token::Rbracket => write!(f, "]"),
 
             Token::Function => write!(f, "fn"),
             Token::Let => write!(f, "let"),
@@ -85,10 +89,10 @@ impl fmt::Display for Token {
 }
 
 pub fn lookup_ident(ident: &str) -> Token {
-    keyword_to_token_kind(ident).unwrap_or(Token::Ident(ident.to_owned()))
+    keyword_to_token(ident).unwrap_or(Token::Ident(ident.to_owned()))
 }
 
-fn keyword_to_token_kind(keyword: &str) -> Option<Token> {
+fn keyword_to_token(keyword: &str) -> Option<Token> {
     match keyword {
         "fn" => Some(Token::Function),
         "let" => Some(Token::Let),

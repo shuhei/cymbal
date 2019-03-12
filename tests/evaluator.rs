@@ -192,6 +192,29 @@ mod evalator_tests {
         ]);
     }
 
+    #[test]
+    fn array_literal() {
+        expect_values(vec![
+            ("[1, 2 * 3, 4 + (5 - 6)]", "[1, 6, 3]"),
+        ]);
+    }
+
+    #[test]
+    fn array_index_expression() {
+        expect_values(vec![
+            ("[1, 2, 3][0]", "1"),
+            ("[1, 2, 3][1]", "2"),
+            ("[1, 2, 3][2]", "3"),
+            ("let i = 0; [1][i];", "1"),
+            ("[1, 2, 3][1 + 1];", "3"),
+            ("let myArray = [1, 2, 3]; myArray[2];", "3"),
+            ("let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];", "6"),
+            ("let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]", "2"),
+            ("[1, 2, 3][3]", "null"),
+            ("[1, 2, 3][-1]", "null"),
+        ]);
+    }
+
     fn expect_values(tests: Vec<(&str, &str)>) {
         for (input, expected) in &tests {
             match eval_input(input) {

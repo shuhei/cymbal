@@ -52,6 +52,8 @@ pub enum Expression {
     IntegerLiteral(i64),
     StringLiteral(String),
     Boolean(bool),
+    Array(Vec<Expression>),
+    Index(Box<Expression>, Box<Expression>),
     Prefix(Prefix, Box<Expression>),
     Infix(Infix, Box<Expression>, Box<Expression>),
     If(Box<Expression>, BlockStatement, Option<BlockStatement>),
@@ -67,6 +69,8 @@ impl fmt::Display for Expression {
             // TODO: Escape `"`
             Expression::StringLiteral(s) => write!(f, "\"{}\"", s),
             Expression::Boolean(value) => write!(f, "{}", value),
+            Expression::Array(values) => write!(f, "[{}]", comma_separated(values)),
+            Expression::Index(left, index) => write!(f, "({}[{}])", left, index),
             Expression::Prefix(operator, exp) => write!(f, "({}{})", operator, exp),
             Expression::Infix(operator, left, right) => {
                 write!(f, "({} {} {})", left, operator, right)
@@ -81,18 +85,18 @@ impl fmt::Display for Expression {
             Expression::FunctionLiteral(parameters, body) => {
                 write!(f, "fn({}) {}", parameters.join(", "), body)
             }
-            Expression::Call(function, arguments) => write!(
-                f,
-                "{}({})",
-                function,
-                arguments
-                    .iter()
-                    .map(|a| a.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
+            Expression::Call(function, arguments) => {
+                write!(f, "{}({})", function, comma_separated(arguments))
+            }
         }
     }
+}
+
+fn comma_separated(exps: &[Expression]) -> String {
+    exps.iter()
+        .map(|a| a.to_string())
+        .collect::<Vec<String>>()
+        .join(", ")
 }
 
 #[derive(Debug, PartialEq, Clone)]

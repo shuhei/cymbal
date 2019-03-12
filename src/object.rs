@@ -12,6 +12,7 @@ pub enum Object {
     Boolean(bool),
     Integer(i64),
     String(String),
+    Array(Vec<Object>),
     Null,
     Return(Box<Object>),
     Function(Vec<String>, BlockStatement, Rc<RefCell<Environment>>),
@@ -24,6 +25,15 @@ impl fmt::Display for Object {
             Object::Boolean(value) => write!(f, "{}", value),
             Object::Integer(value) => write!(f, "{}", value),
             Object::String(value) => write!(f, "\"{}\"", value),
+            Object::Array(values) => write!(
+                f,
+                "[{}]",
+                values
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
             Object::Null => write!(f, "null"),
             Object::Return(value) => write!(f, "{}", *value),
             Object::Function(params, body, _) => {
@@ -40,6 +50,7 @@ impl Object {
             Object::Boolean(_) => "BOOLEAN",
             Object::Integer(_) => "INTEGER",
             Object::String(_) => "STRING",
+            Object::Array(_) => "ARRAY",
             Object::Null => "NULL",
             Object::Return(_) => "RETURN",
             Object::Function(_, _, _) => "FUNCTION",
@@ -64,6 +75,7 @@ pub enum EvalError {
     NotFunction(Object),
     WrongArgumentCount { expected: usize, given: usize },
     UnsupportedArguments(String, Vec<Object>),
+    UnknownIndexOperator(Object, Object),
 }
 
 impl fmt::Display for EvalError {
@@ -102,6 +114,12 @@ impl fmt::Display for EvalError {
                     .map(|a| a.type_name())
                     .collect::<Vec<&str>>()
                     .join(", ")
+            ),
+            EvalError::UnknownIndexOperator(left, index) => write!(
+                f,
+                "unknown operator: {}[{}]",
+                left.type_name(),
+                index.type_name()
             ),
         }
     }

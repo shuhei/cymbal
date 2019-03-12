@@ -226,7 +226,9 @@ mod parser_tests {
             ("let x = 3", "let x = 3;"),
             ("let x = 3 + f * 8;", "let x = (3 + (f * 8));"),
             ("\"hello world\"", "\"hello world\";"),
-            ("let s = \"hello world\"", "let s = \"hello world\";")
+            ("let s = \"hello world\"", "let s = \"hello world\";"),
+            ("a * [1, 2, 3, 4][b * c] * d", "((a * ([1, 2, 3, 4][(b * c)])) * d);"),
+            ("add(a * b[2], b[1], 2 * [1, 2][1])", "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])));")
         ];
         for (input, expected) in tests {
             let lexer = Lexer::new(input);

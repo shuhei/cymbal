@@ -57,6 +57,8 @@ fn eval_expression(expression: &Expression, env: Rc<RefCell<Environment>>) -> Ev
         Expression::IntegerLiteral(int) => Ok(Object::Integer(*int)),
         Expression::StringLiteral(s) => Ok(Object::String(s.to_string())),
         Expression::Boolean(value) => Ok(Object::Boolean(*value)),
+        Expression::Array(values) => eval_array_literal(values, env),
+        Expression::Index(left, index) => eval_array_index(left, index, env),
         Expression::Prefix(prefix, exp) => eval_prefix_expression(prefix, exp.as_ref(), env),
         Expression::Infix(infix, left, right) => {
             eval_infix_expression(infix, left.as_ref(), right.as_ref(), env)
@@ -74,6 +76,31 @@ fn eval_expression(expression: &Expression, env: Rc<RefCell<Environment>>) -> Ev
             let arguments = eval_expressions(args, env)?;
             apply_function(function, arguments)
         }
+    }
+}
+
+fn eval_array_literal(exps: &Vec<Expression>, env: Rc<RefCell<Environment>>) -> EvalResult {
+    let values = eval_expressions(exps, env)?;
+    Ok(Object::Array(values))
+}
+
+fn eval_array_index(
+    left: &Expression,
+    index: &Expression,
+    env: Rc<RefCell<Environment>>,
+) -> EvalResult {
+    let left_evaluated = eval_expression(left, env.clone())?;
+    let index_evaluated = eval_expression(index, env)?;
+    match (left_evaluated, index_evaluated) {
+        (Object::Array(array), Object::Integer(int)) => {
+            let idx = int as usize;
+            if idx < array.len() {
+                Ok(array[idx].clone())
+            } else {
+                Ok(Object::Null)
+            }
+        }
+        (l, i) => Err(EvalError::UnknownIndexOperator(l, i))
     }
 }
 

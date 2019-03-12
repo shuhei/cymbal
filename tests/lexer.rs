@@ -28,6 +28,7 @@ mod lexer_tests {
             10 != 9;
             "foobar"
             "foo bar"
+            [1, 2, 3];
         "#;
 
         let tests = [
@@ -106,6 +107,14 @@ mod lexer_tests {
             Token::Semicolon,
             Token::String("foobar".to_string()),
             Token::String("foo bar".to_string()),
+            Token::Lbracket,
+            Token::Int("1".to_string()),
+            Token::Comma,
+            Token::Int("2".to_string()),
+            Token::Comma,
+            Token::Int("3".to_string()),
+            Token::Rbracket,
+            Token::Semicolon,
             Token::Eof,
         ];
 

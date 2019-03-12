@@ -84,6 +84,12 @@ impl Lexer {
             '}' => {
                 tok = Token::Rbrace;
             }
+            '[' => {
+                tok = Token::Lbracket;
+            }
+            ']' => {
+                tok = Token::Rbracket;
+            }
             '"' => {
                 tok = Token::String(self.read_string().to_string());
             }
