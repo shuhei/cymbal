@@ -11,7 +11,7 @@ mod evalator_tests {
 
     #[test]
     fn eval_boolean() {
-        test_eval(vec![
+        expect_values(vec![
             // Prefix
             ("!true", "false"),
             ("!!true", "true"),
@@ -40,7 +40,7 @@ mod evalator_tests {
 
     #[test]
     fn eval_integer() {
-        test_eval(vec![
+        expect_values(vec![
             // Prefix
             ("-123", "-123"),
             ("-(-123)", "123"),
@@ -62,7 +62,7 @@ mod evalator_tests {
 
     #[test]
     fn eval_if() {
-        test_eval(vec![
+        expect_values(vec![
             ("if (true) { 10 }", "10"),
             ("if (false) { 10 }", "null"),
             ("if (null) { 1 } else { 2 }", "2"),
@@ -75,7 +75,7 @@ mod evalator_tests {
 
     #[test]
     fn eval_return() {
-        test_eval(vec![
+        expect_values(vec![
             ("return;", "null"),
             ("return 10;", "10"),
             ("1 + 2; return; 3 + 4", "null"),
@@ -96,7 +96,7 @@ mod evalator_tests {
 
     #[test]
     fn error_handling() {
-        let tests = vec![
+        expect_errors(vec![
             ("5 + true;", "type mismatch: INTEGER + BOOLEAN"),
             ("5 + true; 5;", "type mismatch: INTEGER + BOOLEAN"),
             ("-true", "unknown operator: -BOOLEAN"),
@@ -123,24 +123,12 @@ mod evalator_tests {
                 "type mismatch: INTEGER == BOOLEAN",
             ),
             ("foobar", "identifier not found: foobar"),
-            (r#""hello world" - "hello""#, "unknown operator: STRING - STRING"),
-            ("let add = fn(x, y) { x + y }; add(123); 3;", "wrong number of arguments: expected 2, given 1"),
-        ];
-        for (input, expected_message) in &tests {
-            match eval_input(input) {
-                Ok(obj) => {
-                    panic!("no error object returned. got=`{}` for `{}`", obj, input);
-                }
-                Err(err) => {
-                    assert_eq!(&err.to_string(), expected_message, "for `{}`", input);
-                }
-            }
-        }
+        ]);
     }
 
     #[test]
     fn let_statement() {
-        test_eval(vec![
+        expect_values(vec![
             ("let a = 5; a;", "5"),
             ("let a = 5 * 5; a;", "25"),
             ("let a = 5; let b = a; b;", "5"),
@@ -150,12 +138,12 @@ mod evalator_tests {
 
     #[test]
     fn function_object() {
-        test_eval(vec![("fn(x) { x + 2; }", "fn(x) {\n{ (x + 2); }\n}")]);
+        expect_values(vec![("fn(x) { x + 2; }", "fn(x) {\n{ (x + 2); }\n}")]);
     }
 
     #[test]
     fn function_application() {
-        test_eval(vec![
+        expect_values(vec![
             ("let identity = fn(x) { x; }; identity(5);", "5"),
             ("let identity = fn(x) { return x; }; identity(5);", "5"),
             ("let double = fn(x) { x * 2; }; double(5);", "10"),
@@ -167,11 +155,14 @@ mod evalator_tests {
             ("fn(x) { x; }(5);", "5"),
             ("fn(x) { x; }(1); 5;", "5"),
         ]);
+        expect_errors(vec![
+            ("let add = fn(x, y) { x + y }; add(123); 3;", "wrong number of arguments: expected 2, given 1"),
+        ]);
     }
 
     #[test]
     fn closure() {
-        test_eval(vec![(
+        expect_values(vec![(
             "let newAdder = fn(x) { fn(y) { x + y } }; let addTwo = newAdder(2); addTwo(3);",
             "5",
         )]);
@@ -179,13 +170,29 @@ mod evalator_tests {
 
     #[test]
     fn string() {
-        test_eval(vec![
+        expect_values(vec![
             (r#""Hello, World!""#, r#""Hello, World!""#),
             (r#""hello" + " " + "world""#, r#""hello world""#),
         ]);
+        expect_errors(vec![
+            (r#""hello world" - "hello""#, "unknown operator: STRING - STRING"),
+        ]);
     }
 
-    fn test_eval(tests: Vec<(&str, &str)>) {
+    #[test]
+    fn builtin_function() {
+        expect_values(vec![
+            (r#"len("")"#, "0"),
+            (r#"len("four")"#, "4"),
+            (r#"len("hello world")"#, "11"),
+        ]);
+        expect_errors(vec![
+            ("len(1)", "unsupported arguments to `len`: INTEGER"),
+            (r#"len("one", "two")"#, "wrong number of arguments: expected 1, given 2"),
+        ]);
+    }
+
+    fn expect_values(tests: Vec<(&str, &str)>) {
         for (input, expected) in &tests {
             match eval_input(input) {
                 Ok(obj) => {
@@ -196,6 +203,19 @@ mod evalator_tests {
                         "expected `{}`, but got error=`{}` for `{}`",
                         expected, err, input
                     );
+                }
+            }
+        }
+    }
+
+    fn expect_errors(tests: Vec<(&str, &str)>) {
+        for (input, expected_message) in &tests {
+            match eval_input(input) {
+                Ok(obj) => {
+                    panic!("no error object returned. got=`{}` for `{}`", obj, input);
+                }
+                Err(err) => {
+                    assert_eq!(&err.to_string(), expected_message, "for `{}`", input);
                 }
             }
         }

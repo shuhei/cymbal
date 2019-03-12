@@ -78,28 +78,35 @@ fn eval_expression(expression: &Expression, env: Rc<RefCell<Environment>>) -> Ev
 }
 
 fn apply_function(function: Object, arguments: Vec<Object>) -> EvalResult {
-    if let Object::Function(params, body, env) = function {
-        if params.len() != arguments.len() {
-            return Err(EvalError::WrongArgumentCount {
-                expected: params.len(),
-                given: arguments.len(),
-            });
+    match function {
+        Object::Function(params, body, env) => {
+            assert_argument_count(params.len(), &arguments)?;
+            let new_env = extend_function_env(params, arguments, env);
+            let evaluated = eval_block_statement(&body, new_env)?;
+            unwrap_return_value(evaluated)
         }
+        Object::Builtin(func) => func(arguments),
+        _ => Err(EvalError::NotFunction(function.clone())),
+    }
+}
 
-        let new_env = Rc::new(RefCell::new(Environment::extend(env)));
-        for (i, param) in params.iter().enumerate() {
-            let arg = arguments.get(i).unwrap_or(&Object::Null);
-            new_env.borrow_mut().set(param, arg.clone());
-        }
+fn extend_function_env(
+    params: Vec<String>,
+    arguments: Vec<Object>,
+    env: Rc<RefCell<Environment>>,
+) -> Rc<RefCell<Environment>> {
+    let new_env = Rc::new(RefCell::new(Environment::extend(env)));
+    for (i, param) in params.iter().enumerate() {
+        let arg = arguments.get(i).unwrap_or(&Object::Null);
+        new_env.borrow_mut().set(param, arg.clone());
+    }
+    new_env
+}
 
-        let result = eval_block_statement(&body, new_env)?;
-        // Unwrap the returned value.
-        match result {
-            Object::Return(value) => Ok(*value),
-            _ => Ok(result),
-        }
-    } else {
-        Err(EvalError::NotFunction(function.clone()))
+fn unwrap_return_value(obj: Object) -> EvalResult {
+    match obj {
+        Object::Return(value) => Ok(*value),
+        _ => Ok(obj),
     }
 }
 
@@ -199,10 +206,13 @@ fn eval_if_expression(
 }
 
 fn eval_identifier(name: &str, env: Rc<RefCell<Environment>>) -> EvalResult {
-    match env.borrow().get(name) {
-        Some(obj) => Ok(obj.clone()),
-        None => Err(EvalError::IdentifierNotFound(name.to_string())),
+    if let Some(obj) = env.borrow().get(name) {
+        return Ok(obj.clone());
     }
+    if let Some(obj) = lookup_builtin(name) {
+        return Ok(obj);
+    }
+    Err(EvalError::IdentifierNotFound(name.to_string()))
 }
 
 fn eval_expressions(
@@ -214,4 +224,35 @@ fn eval_expressions(
         results.push(eval_expression(exp, Rc::clone(&env))?);
     }
     Ok(results)
+}
+
+fn lookup_builtin(name: &str) -> Option<Object> {
+    match name {
+        // TODO: Should `null` be a reserved word? Otherwise it can be overridden like `undefined`
+        // of JavaScript non-strict mode.
+        "null" => Some(Object::Null),
+        "len" => Some(Object::Builtin(len)),
+        _ => None,
+    }
+}
+
+fn len(arguments: Vec<Object>) -> EvalResult {
+    assert_argument_count(1, &arguments)?;
+    match &arguments[0] {
+        Object::String(value) => Ok(Object::Integer(value.len() as i64)),
+        _ => Err(EvalError::UnsupportedArguments(
+            "len".to_string(),
+            arguments,
+        )),
+    }
+}
+
+fn assert_argument_count(expected: usize, arguments: &[Object]) -> Result<(), EvalError> {
+    if arguments.len() != expected {
+        return Err(EvalError::WrongArgumentCount {
+            expected,
+            given: arguments.len(),
+        });
+    }
+    Ok(())
 }

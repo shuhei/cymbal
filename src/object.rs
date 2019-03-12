@@ -5,6 +5,7 @@ use std::fmt;
 use std::rc::Rc;
 
 pub type EvalResult = Result<Object, EvalError>;
+pub type BuiltinFunction = fn(Vec<Object>) -> EvalResult;
 
 #[derive(Clone)]
 pub enum Object {
@@ -14,6 +15,7 @@ pub enum Object {
     Null,
     Return(Box<Object>),
     Function(Vec<String>, BlockStatement, Rc<RefCell<Environment>>),
+    Builtin(BuiltinFunction),
 }
 
 impl fmt::Display for Object {
@@ -27,6 +29,7 @@ impl fmt::Display for Object {
             Object::Function(params, body, _) => {
                 write!(f, "fn({}) {{\n{}\n}}", params.join(", "), body)
             }
+            Object::Builtin(_) => write!(f, "builtin function"),
         }
     }
 }
@@ -40,6 +43,7 @@ impl Object {
             Object::Null => "NULL",
             Object::Return(_) => "RETURN",
             Object::Function(_, _, _) => "FUNCTION",
+            Object::Builtin(_) => "BUILTIN",
         }
     }
 
@@ -59,6 +63,7 @@ pub enum EvalError {
     IdentifierNotFound(String),
     NotFunction(Object),
     WrongArgumentCount { expected: usize, given: usize },
+    UnsupportedArguments(String, Vec<Object>),
 }
 
 impl fmt::Display for EvalError {
@@ -88,6 +93,16 @@ impl fmt::Display for EvalError {
                 "wrong number of arguments: expected {}, given {}",
                 expected, given
             ),
+            EvalError::UnsupportedArguments(name, arguments) => write!(
+                f,
+                "unsupported arguments to `{}`: {}",
+                name,
+                arguments
+                    .iter()
+                    .map(|a| a.type_name())
+                    .collect::<Vec<&str>>()
+                    .join(", ")
+            ),
         }
     }
 }
@@ -99,13 +114,10 @@ pub struct Environment {
 
 impl Environment {
     pub fn new() -> Self {
-        let mut env = Environment {
+        Environment {
             store: HashMap::new(),
             outer: None,
-        };
-        // TODO: Should `null` be a reserved word?
-        env.set("null", Object::Null);
-        env
+        }
     }
 
     pub fn extend(outer: Rc<RefCell<Self>>) -> Environment {
