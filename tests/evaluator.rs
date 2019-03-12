@@ -185,6 +185,8 @@ mod evalator_tests {
             (r#"len("")"#, "0"),
             (r#"len("four")"#, "4"),
             (r#"len("hello world")"#, "11"),
+            ("len([1, 2, 3])", "3"),
+            ("len([])", "0"),
         ]);
         expect_errors(vec![
             ("len(1)", "unsupported arguments to `len`: INTEGER"),
