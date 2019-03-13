@@ -21,3 +21,7 @@ Test:
 ```sh
 cargo test
 ```
+
+## License
+
+MIT
