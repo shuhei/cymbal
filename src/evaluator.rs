@@ -100,7 +100,7 @@ fn eval_array_index(
                 Ok(Object::Null)
             }
         }
-        (l, i) => Err(EvalError::UnknownIndexOperator(l, i))
+        (l, i) => Err(EvalError::UnknownIndexOperator(l, i)),
     }
 }
 
@@ -259,6 +259,9 @@ fn lookup_builtin(name: &str) -> Option<Object> {
         // of JavaScript non-strict mode.
         "null" => Some(Object::Null),
         "len" => Some(Object::Builtin(len)),
+        "first" => Some(Object::Builtin(first)),
+        "last" => Some(Object::Builtin(last)),
+        "rest" => Some(Object::Builtin(rest)),
         _ => None,
     }
 }
@@ -270,6 +273,51 @@ fn len(arguments: Vec<Object>) -> EvalResult {
         Object::Array(values) => Ok(Object::Integer(values.len() as i64)),
         _ => Err(EvalError::UnsupportedArguments(
             "len".to_string(),
+            arguments,
+        )),
+    }
+}
+
+fn first(arguments: Vec<Object>) -> EvalResult {
+    assert_argument_count(1, &arguments)?;
+    match &arguments[0] {
+        Object::Array(values) => Ok(match values.first() {
+            Some(item) => item.clone(),
+            None => Object::Null,
+        }),
+        _ => Err(EvalError::UnsupportedArguments(
+            "first".to_string(),
+            arguments,
+        )),
+    }
+}
+
+fn last(arguments: Vec<Object>) -> EvalResult {
+    assert_argument_count(1, &arguments)?;
+    match &arguments[0] {
+        Object::Array(values) => Ok(match values.last() {
+            Some(item) => item.clone(),
+            None => Object::Null,
+        }),
+        _ => Err(EvalError::UnsupportedArguments(
+            "last".to_string(),
+            arguments,
+        )),
+    }
+}
+
+fn rest(arguments: Vec<Object>) -> EvalResult {
+    assert_argument_count(1, &arguments)?;
+    match &arguments[0] {
+        Object::Array(values) => {
+            if values.len() > 1 {
+                Ok(Object::Array(values[1..].to_vec()))
+            } else {
+                Ok(Object::Null)
+            }
+        }
+        _ => Err(EvalError::UnsupportedArguments(
+            "rest".to_string(),
             arguments,
         )),
     }

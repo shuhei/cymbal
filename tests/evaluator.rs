@@ -155,9 +155,10 @@ mod evalator_tests {
             ("fn(x) { x; }(5);", "5"),
             ("fn(x) { x; }(1); 5;", "5"),
         ]);
-        expect_errors(vec![
-            ("let add = fn(x, y) { x + y }; add(123); 3;", "wrong number of arguments: expected 2, given 1"),
-        ]);
+        expect_errors(vec![(
+            "let add = fn(x, y) { x + y }; add(123); 3;",
+            "wrong number of arguments: expected 2, given 1",
+        )]);
     }
 
     #[test]
@@ -174,9 +175,10 @@ mod evalator_tests {
             (r#""Hello, World!""#, r#""Hello, World!""#),
             (r#""hello" + " " + "world""#, r#""hello world""#),
         ]);
-        expect_errors(vec![
-            (r#""hello world" - "hello""#, "unknown operator: STRING - STRING"),
-        ]);
+        expect_errors(vec![(
+            r#""hello world" - "hello""#,
+            "unknown operator: STRING - STRING",
+        )]);
     }
 
     #[test]
@@ -187,18 +189,42 @@ mod evalator_tests {
             (r#"len("hello world")"#, "11"),
             ("len([1, 2, 3])", "3"),
             ("len([])", "0"),
+            ("first([1, 2, 3])", "1"),
+            ("first([])", "null"),
+            ("last([1, 2, 3])", "3"),
+            ("last([])", "null"),
+            ("rest([1, 2, 3])", "[2, 3]"),
+            ("rest(rest([1, 2, 3]))", "[3]"),
+            ("rest(rest(rest([1, 2, 3])))", "null"),
+            ("rest([])", "null"),
         ]);
         expect_errors(vec![
             ("len(1)", "unsupported arguments to `len`: INTEGER"),
-            (r#"len("one", "two")"#, "wrong number of arguments: expected 1, given 2"),
+            (
+                r#"len("one", "two")"#,
+                "wrong number of arguments: expected 1, given 2",
+            ),
+            ("first(1)", "unsupported arguments to `first`: INTEGER"),
+            (
+                "first([1, 2], [3, 4])",
+                "wrong number of arguments: expected 1, given 2",
+            ),
+            ("last(1)", "unsupported arguments to `last`: INTEGER"),
+            (
+                "last([1, 2], [3, 4])",
+                "wrong number of arguments: expected 1, given 2",
+            ),
+            ("rest(1)", "unsupported arguments to `rest`: INTEGER"),
+            (
+                "rest([1, 2], [3, 4])",
+                "wrong number of arguments: expected 1, given 2",
+            ),
         ]);
     }
 
     #[test]
     fn array_literal() {
-        expect_values(vec![
-            ("[1, 2 * 3, 4 + (5 - 6)]", "[1, 6, 3]"),
-        ]);
+        expect_values(vec![("[1, 2 * 3, 4 + (5 - 6)]", "[1, 6, 3]")]);
     }
 
     #[test]
@@ -210,8 +236,14 @@ mod evalator_tests {
             ("let i = 0; [1][i];", "1"),
             ("[1, 2, 3][1 + 1];", "3"),
             ("let myArray = [1, 2, 3]; myArray[2];", "3"),
-            ("let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];", "6"),
-            ("let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]", "2"),
+            (
+                "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+                "6",
+            ),
+            (
+                "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+                "2",
+            ),
             ("[1, 2, 3][3]", "null"),
             ("[1, 2, 3][-1]", "null"),
         ]);
