@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug, PartialEq)]
 pub struct Program {
@@ -14,7 +16,7 @@ impl fmt::Display for Program {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub struct BlockStatement {
     pub statements: Vec<Statement>,
 }
@@ -28,7 +30,7 @@ impl fmt::Display for BlockStatement {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum Statement {
     Let(String, Expression),
     Return(Option<Expression>),
@@ -46,19 +48,36 @@ impl fmt::Display for Statement {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum Expression {
     Identifier(String),
     IntegerLiteral(i64),
     StringLiteral(String),
     Boolean(bool),
     Array(Vec<Expression>),
+    Hash(HashLiteral),
     Index(Box<Expression>, Box<Expression>),
     Prefix(Prefix, Box<Expression>),
     Infix(Infix, Box<Expression>, Box<Expression>),
     If(Box<Expression>, BlockStatement, Option<BlockStatement>),
     FunctionLiteral(Vec<String>, BlockStatement),
     Call(Box<Expression>, Vec<Expression>),
+}
+
+// Have a separate struct to implement `Hash` trait.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HashLiteral {
+    pub pairs: HashMap<Expression, Expression>,
+}
+
+// `HashMap` cannot derive `Hash` trait.
+impl Hash for HashLiteral {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for (k, v) in &self.pairs {
+            k.hash(state);
+            v.hash(state);
+        }
+    }
 }
 
 impl fmt::Display for Expression {
@@ -70,6 +89,15 @@ impl fmt::Display for Expression {
             Expression::StringLiteral(s) => write!(f, "\"{}\"", s),
             Expression::Boolean(value) => write!(f, "{}", value),
             Expression::Array(values) => write!(f, "[{}]", comma_separated(values)),
+            Expression::Hash(HashLiteral { pairs }) => {
+                // Print items in a stable order for testing.
+                let mut items = pairs
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k, v))
+                    .collect::<Vec<String>>();
+                items.sort();
+                write!(f, "{{{}}}", items.join(", "))
+            }
             Expression::Index(left, index) => write!(f, "({}[{}])", left, index),
             Expression::Prefix(operator, exp) => write!(f, "({}{})", operator, exp),
             Expression::Infix(operator, left, right) => {
@@ -99,7 +127,7 @@ fn comma_separated(exps: &[Expression]) -> String {
         .join(", ")
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum Infix {
     Eq,
     NotEq,
@@ -126,7 +154,7 @@ impl fmt::Display for Infix {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum Prefix {
     Bang,
     Minus,

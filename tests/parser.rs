@@ -178,7 +178,7 @@ mod parser_tests {
 
     #[test]
     fn operator_precedence() {
-        let tests = vec![
+        test_parsing(vec![
             ("-a * b", "((-a) * b);"),
             ("!-a", "(!(-a));"),
             ("a + b + c", "((a + b) + c);"),
@@ -229,7 +229,20 @@ mod parser_tests {
             ("let s = \"hello world\"", "let s = \"hello world\";"),
             ("a * [1, 2, 3, 4][b * c] * d", "((a * ([1, 2, 3, 4][(b * c)])) * d);"),
             ("add(a * b[2], b[1], 2 * [1, 2][1])", "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])));")
-        ];
+        ]);
+    }
+
+    #[test]
+    fn hash() {
+        test_parsing(vec![
+            ("{}", "{};"),
+            ("{1: 2, 2: 3}", "{1: 2, 2: 3};"),
+            ("{true: 3}", "{true: 3};"),
+            (r#"{"one": 1, "two": 2, "three": 3}"#, r#"{"one": 1, "three": 3, "two": 2};"#),
+        ]);
+    }
+
+    fn test_parsing(tests: Vec<(&str, &str)>) {
         for (input, expected) in tests {
             let lexer = Lexer::new(input);
             let mut parser = Parser::new(lexer);

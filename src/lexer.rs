@@ -40,6 +40,9 @@ impl Lexer {
                     tok = Token::Assign;
                 }
             }
+            ':' => {
+                tok = Token::Colon;
+            }
             ';' => {
                 tok = Token::Semicolon;
             }

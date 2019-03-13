@@ -1,6 +1,7 @@
-use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
-use crate::object::{Environment, EvalError, EvalResult, Object};
+use crate::ast::{BlockStatement, Expression, HashLiteral, Infix, Prefix, Program, Statement};
+use crate::object::{Environment, EvalError, EvalResult, HashKey, Object};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 // Evaluate a program
@@ -58,7 +59,8 @@ fn eval_expression(expression: &Expression, env: Rc<RefCell<Environment>>) -> Ev
         Expression::StringLiteral(s) => Ok(Object::String(s.to_string())),
         Expression::Boolean(value) => Ok(Object::Boolean(*value)),
         Expression::Array(values) => eval_array_literal(values, env),
-        Expression::Index(left, index) => eval_array_index(left, index, env),
+        Expression::Hash(HashLiteral { pairs }) => eval_hash_literal(pairs, env),
+        Expression::Index(left, index) => eval_index_expression(left, index, env),
         Expression::Prefix(prefix, exp) => eval_prefix_expression(prefix, exp.as_ref(), env),
         Expression::Infix(infix, left, right) => {
             eval_infix_expression(infix, left.as_ref(), right.as_ref(), env)
@@ -84,7 +86,21 @@ fn eval_array_literal(exps: &Vec<Expression>, env: Rc<RefCell<Environment>>) -> 
     Ok(Object::Array(values))
 }
 
-fn eval_array_index(
+fn eval_hash_literal(
+    pairs: &HashMap<Expression, Expression>,
+    env: Rc<RefCell<Environment>>,
+) -> EvalResult {
+    let mut map = HashMap::new();
+    for (k, v) in pairs {
+        let key = eval_expression(k, env.clone())?;
+        let value = eval_expression(v, env.clone())?;
+        let hash_key = HashKey::from_object(key)?;
+        map.insert(hash_key, value);
+    }
+    Ok(Object::Hash(map))
+}
+
+fn eval_index_expression(
     left: &Expression,
     index: &Expression,
     env: Rc<RefCell<Environment>>,
@@ -92,16 +108,23 @@ fn eval_array_index(
     let left_evaluated = eval_expression(left, env.clone())?;
     let index_evaluated = eval_expression(index, env)?;
     match (left_evaluated, index_evaluated) {
-        (Object::Array(array), Object::Integer(int)) => {
-            let idx = int as usize;
-            if idx < array.len() {
-                Ok(array[idx].clone())
-            } else {
-                Ok(Object::Null)
-            }
+        (Object::Array(array), Object::Integer(value)) => Ok(or_null(array.get(value as usize))),
+        (Object::Hash(pairs), Object::Integer(value)) => {
+            Ok(or_null(pairs.get(&HashKey::Integer(value))))
         }
+        (Object::Hash(pairs), Object::String(value)) => {
+            Ok(or_null(pairs.get(&HashKey::String(value))))
+        }
+        (Object::Hash(pairs), Object::Boolean(value)) => {
+            Ok(or_null(pairs.get(&HashKey::Boolean(value))))
+        }
+        (Object::Hash(_), key) => Err(EvalError::UnsupportedHashKey(key)),
         (l, i) => Err(EvalError::UnknownIndexOperator(l, i)),
     }
+}
+
+fn or_null(option: Option<&Object>) -> Object {
+    option.map(|v| v.clone()).unwrap_or(Object::Null)
 }
 
 fn apply_function(function: Object, arguments: Vec<Object>) -> EvalResult {
@@ -124,8 +147,8 @@ fn extend_function_env(
 ) -> Rc<RefCell<Environment>> {
     let new_env = Rc::new(RefCell::new(Environment::extend(env)));
     for (i, param) in params.iter().enumerate() {
-        let arg = arguments.get(i).unwrap_or(&Object::Null);
-        new_env.borrow_mut().set(param, arg.clone());
+        let arg = or_null(arguments.get(i));
+        new_env.borrow_mut().set(param, arg);
     }
     new_env
 }

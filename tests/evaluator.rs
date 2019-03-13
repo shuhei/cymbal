@@ -299,6 +299,23 @@ mod evalator_tests {
         ]);
     }
 
+    #[test]
+    fn hash() {
+        expect_values(vec![
+            (r#"{"foo": 123, "bar": 234}"#, r#"{"bar": 234, "foo": 123}"#),
+            (r#"{"foo": 123, "bar": 234}["baz"]"#, "null"),
+            (r#"{"foo": 123, "bar": 234}["foo"]"#, "123"),
+            (r#"{1: 123, 2: 234}[2]"#, "234"),
+            (r#"{true: 3 * 4, false: 2 * 8}[true]"#, "12"),
+            (r#"{true: 3 * 4, false: 2 * 8}[false]"#, "16"),
+            (r#"{"thr" + "ee": 6 / 2, 1: 1}["th" + "ree"]"#, "3"),
+            (r#"let key = "foo"; {"foo": 5}[key]"#, "5"),
+        ]);
+        expect_errors(vec![
+            ("{12: 234}[fn(x) { x }];", "unusable as hash key: FUNCTION"),
+        ]);
+    }
+
     fn with_def(def: &str, code: &str) -> String {
         def.to_string() + code
     }

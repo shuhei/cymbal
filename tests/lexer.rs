@@ -29,6 +29,7 @@ mod lexer_tests {
             "foobar"
             "foo bar"
             [1, 2, 3];
+            {"foo": "bar"}
         "#;
 
         let tests = [
@@ -115,6 +116,11 @@ mod lexer_tests {
             Token::Int("3".to_string()),
             Token::Rbracket,
             Token::Semicolon,
+            Token::Lbrace,
+            Token::String("foo".to_string()),
+            Token::Colon,
+            Token::String("bar".to_string()),
+            Token::Rbrace,
             Token::Eof,
         ];
 

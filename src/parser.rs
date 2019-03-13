@@ -1,6 +1,7 @@
-use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
+use crate::ast::{BlockStatement, Expression, HashLiteral, Infix, Prefix, Program, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
+use std::collections::HashMap;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum Precedence {
@@ -31,6 +32,8 @@ pub enum ParserError {
     ExpectedRbracket(Token),
     ExpectedAssign(Token),
     ExpectedSemicolon(Token),
+    ExpectedComma(Token),
+    ExpectedColon(Token),
     ParseInt(String),
 }
 
@@ -204,6 +207,7 @@ impl Parser {
             Token::Minus => Some(Parser::parse_prefix_expression),
             Token::Lparen => Some(Parser::parse_grouped_expression),
             Token::Lbracket => Some(Parser::parse_array_literal),
+            Token::Lbrace => Some(Parser::parse_hash_literal),
             Token::If => Some(Parser::parse_if_expression),
             Token::Function => Some(Parser::parse_function_literal),
             _ => None,
@@ -272,6 +276,39 @@ impl Parser {
         // cur_token: ]
 
         Ok(Expression::Array(exps))
+    }
+
+    fn parse_hash_literal(&mut self) -> Result<Expression> {
+        // cur_token: {
+        let mut pairs = HashMap::new();
+
+        while self.peek_token != Token::Rbrace {
+            // cur_token: { or ,
+            self.next_token();
+            // cur_token: the first token of the key expression
+            let key = self.parse_expression(Precedence::Lowest)?;
+            // cur_token: the last token of the key expression
+
+            self.expect_peek(Token::Colon, ParserError::ExpectedColon)?;
+            // cur_token: :
+            self.next_token();
+            // cur_token: the first token of the value expression
+
+            let value = self.parse_expression(Precedence::Lowest)?;
+            // cur_token: the last token of the value expression
+
+            pairs.insert(key, value);
+
+            if self.peek_token != Token::Rbrace {
+                self.expect_peek(Token::Comma, ParserError::ExpectedComma)?;
+                // cur_token: ,
+            }
+        }
+
+        self.expect_peek(Token::Rbrace, ParserError::ExpectedRbrace)?;
+        // cur_token: }
+
+        Ok(Expression::Hash(HashLiteral { pairs }))
     }
 
     fn parse_if_expression(&mut self) -> Result<Expression> {

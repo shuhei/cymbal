@@ -13,6 +13,7 @@ pub enum Object {
     Integer(i64),
     String(String),
     Array(Vec<Object>),
+    Hash(HashMap<HashKey, Object>),
     Null,
     Return(Box<Object>),
     Function(Vec<String>, BlockStatement, Rc<RefCell<Environment>>),
@@ -34,6 +35,15 @@ impl fmt::Display for Object {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            Object::Hash(pairs) => {
+                // Print keys with a stable order for testing.
+                let mut items = pairs
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k, v))
+                    .collect::<Vec<String>>();
+                items.sort();
+                write!(f, "{{{}}}", items.join(", "))
+            }
             Object::Null => write!(f, "null"),
             Object::Return(value) => write!(f, "{}", *value),
             Object::Function(params, body, _) => {
@@ -51,6 +61,7 @@ impl Object {
             Object::Integer(_) => "INTEGER",
             Object::String(_) => "STRING",
             Object::Array(_) => "ARRAY",
+            Object::Hash(_) => "HASH",
             Object::Null => "NULL",
             Object::Return(_) => "RETURN",
             Object::Function(_, _, _) => "FUNCTION",
@@ -67,6 +78,36 @@ impl Object {
     }
 }
 
+// Having a dedicated type to restrict what can be a hash key,
+// and implement `Hash` trait.
+#[derive(PartialEq, Eq, Hash, Clone)]
+pub enum HashKey {
+    Integer(i64),
+    String(String),
+    Boolean(bool),
+}
+
+impl fmt::Display for HashKey {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            HashKey::Integer(value) => write!(f, "{}", value),
+            HashKey::String(value) => write!(f, "\"{}\"", value),
+            HashKey::Boolean(value) => write!(f, "{}", value),
+        }
+    }
+}
+
+impl HashKey {
+    pub fn from_object(obj: Object) -> Result<HashKey, EvalError> {
+        match obj {
+            Object::Integer(value) => Ok(HashKey::Integer(value)),
+            Object::String(value) => Ok(HashKey::String(value)),
+            Object::Boolean(value) => Ok(HashKey::Boolean(value)),
+            _ => Err(EvalError::UnsupportedHashKey(obj)),
+        }
+    }
+}
+
 pub enum EvalError {
     TypeMismatch(Infix, Object, Object),
     UnknownPrefixOperator(Prefix, Object),
@@ -76,6 +117,7 @@ pub enum EvalError {
     WrongArgumentCount { expected: usize, given: usize },
     UnsupportedArguments(String, Vec<Object>),
     UnknownIndexOperator(Object, Object),
+    UnsupportedHashKey(Object),
 }
 
 impl fmt::Display for EvalError {
@@ -121,6 +163,9 @@ impl fmt::Display for EvalError {
                 left.type_name(),
                 index.type_name()
             ),
+            EvalError::UnsupportedHashKey(key) => {
+                write!(f, "unusable as hash key: {}", key.type_name())
+            }
         }
     }
 }
