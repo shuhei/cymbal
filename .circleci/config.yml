@@ -25,3 +25,8 @@ jobs:
       - run:
           name: Run all tests
           command: cargo test --all
+workflows:
+  version: 2
+  workflow:
+    jobs:
+    - test
