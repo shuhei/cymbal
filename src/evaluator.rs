@@ -263,6 +263,7 @@ fn lookup_builtin(name: &str) -> Option<Object> {
         "last" => Some(Object::Builtin(last)),
         "rest" => Some(Object::Builtin(rest)),
         "push" => Some(Object::Builtin(push)),
+        "puts" => Some(Object::Builtin(puts)),
         _ => None,
     }
 }
@@ -338,6 +339,14 @@ fn push(arguments: Vec<Object>) -> EvalResult {
             arguments,
         )),
     }
+}
+
+fn puts(arguments: Vec<Object>) -> EvalResult {
+    for arg in arguments {
+        // TODO: Remove `""` of Object::String
+        println!("{}", arg);
+    }
+    Ok(Object::Null)
 }
 
 fn assert_argument_count(expected: usize, arguments: &[Object]) -> Result<(), EvalError> {
