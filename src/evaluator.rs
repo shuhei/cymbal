@@ -262,6 +262,7 @@ fn lookup_builtin(name: &str) -> Option<Object> {
         "first" => Some(Object::Builtin(first)),
         "last" => Some(Object::Builtin(last)),
         "rest" => Some(Object::Builtin(rest)),
+        "push" => Some(Object::Builtin(push)),
         _ => None,
     }
 }
@@ -318,6 +319,22 @@ fn rest(arguments: Vec<Object>) -> EvalResult {
         }
         _ => Err(EvalError::UnsupportedArguments(
             "rest".to_string(),
+            arguments,
+        )),
+    }
+}
+
+fn push(arguments: Vec<Object>) -> EvalResult {
+    assert_argument_count(2, &arguments)?;
+    match &arguments[0] {
+        Object::Array(values) => {
+            // TODO: How can I just consume the first and second items of `arguments`?
+            let mut items = values.clone();
+            items.push(arguments[1].clone());
+            Ok(Object::Array(items))
+        }
+        _ => Err(EvalError::UnsupportedArguments(
+            "push".to_string(),
             arguments,
         )),
     }

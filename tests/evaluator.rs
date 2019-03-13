@@ -197,6 +197,9 @@ mod evalator_tests {
             ("rest(rest([1, 2, 3]))", "[3]"),
             ("rest(rest(rest([1, 2, 3])))", "null"),
             ("rest([])", "null"),
+            ("push([1, 2, 3], 4)", "[1, 2, 3, 4]"),
+            ("push(push(push([], 1), 2), 3)", "[1, 2, 3]"),
+            ("push([], 1)", "[1]"),
         ]);
         expect_errors(vec![
             ("len(1)", "unsupported arguments to `len`: INTEGER"),
@@ -218,6 +221,11 @@ mod evalator_tests {
             (
                 "rest([1, 2], [3, 4])",
                 "wrong number of arguments: expected 1, given 2",
+            ),
+            ("push(1, 2)", "unsupported arguments to `push`: INTEGER, INTEGER"),
+            (
+                "push([1, 2])",
+                "wrong number of arguments: expected 2, given 1",
             ),
         ]);
     }
