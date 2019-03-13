@@ -311,7 +311,7 @@ fn rest(arguments: Vec<Object>) -> EvalResult {
     assert_argument_count(1, &arguments)?;
     match &arguments[0] {
         Object::Array(values) => {
-            if values.len() > 1 {
+            if values.len() > 0 {
                 Ok(Object::Array(values[1..].to_vec()))
             } else {
                 Ok(Object::Null)
