@@ -7,7 +7,7 @@ use std::rc::Rc;
 pub type EvalResult = Result<Object, EvalError>;
 pub type BuiltinFunction = fn(Vec<Object>) -> EvalResult;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Object {
     Boolean(bool),
     Integer(i64),
@@ -80,7 +80,7 @@ impl Object {
 
 // Having a dedicated type to restrict what can be a hash key,
 // and implement `Hash` trait.
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum HashKey {
     Integer(i64),
     String(String),
@@ -170,6 +170,7 @@ impl fmt::Display for EvalError {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Environment {
     store: HashMap<String, Object>,
     outer: Option<Rc<RefCell<Environment>>>,
