@@ -1,5 +1,5 @@
 use crate::code;
-use crate::code::{Instructions, OP_CONSTANT};
+use crate::code::{Instructions, OP_ADD, OP_CONSTANT};
 use crate::compiler::Bytecode;
 use crate::object::Object;
 use std::fmt;
@@ -44,6 +44,17 @@ impl Vm {
                         self.constants.len(),
                     ));
                 }
+            } else if op == OP_ADD {
+                let right = self.pop()?;
+                let left = self.pop()?;
+                match (&*left, &*right) {
+                    (Object::Integer(l), Object::Integer(r)) => {
+                        self.push(Rc::new(Object::Integer(l + r)))?;
+                    }
+                    (l, r) => {
+                        return Err(VmError::TypeMismatch(l.clone(), r.clone()));
+                    }
+                }
             }
             ip += 1;
         }
@@ -59,6 +70,12 @@ impl Vm {
         Ok(())
     }
 
+    fn pop(&mut self) -> Result<Rc<Object>, VmError> {
+        let popped = self.stack.pop();
+        self.sp -= 1;
+        popped.ok_or(VmError::StackEmpty)
+    }
+
     pub fn stack_top(&self) -> Option<Rc<Object>> {
         if self.sp > 0 {
             self.stack.get(self.sp - 1).map(|o| Rc::clone(o))
@@ -71,6 +88,8 @@ impl Vm {
 pub enum VmError {
     InvalidConstIndex(usize, usize),
     StackOverflow,
+    StackEmpty,
+    TypeMismatch(Object, Object),
 }
 
 impl fmt::Display for VmError {
@@ -80,6 +99,13 @@ impl fmt::Display for VmError {
                 write!(f, "invalid const index: {} / {}", given, length)
             }
             VmError::StackOverflow => write!(f, "stack overflow"),
+            VmError::StackEmpty => write!(f, "stack empty"),
+            VmError::TypeMismatch(left, right) => write!(
+                f,
+                "type mismatch {} {}",
+                left.type_name(),
+                right.type_name()
+            ),
         }
     }
 }

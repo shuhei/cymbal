@@ -38,6 +38,7 @@ impl Compiler {
             Expression::Infix(_, left, right) => {
                 self.compile_expression(left)?;
                 self.compile_expression(right)?;
+                self.add_instruction(code::add());
             }
             Expression::IntegerLiteral(value) => {
                 let constant = Rc::new(Object::Integer(*value));
