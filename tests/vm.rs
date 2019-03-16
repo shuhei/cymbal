@@ -12,7 +12,7 @@ mod vm_tests {
         test_vm(vec![
             ("1", "1"),
             ("2", "2"),
-            ("1 + 2", "3"), // FIXME
+            ("1 + 2", "3"),
         ]);
     }
 
@@ -36,8 +36,8 @@ mod vm_tests {
                 }
                 _ => {}
             }
-            if let Some(obj) = vm.stack_top() {
-                assert_eq!(&obj.to_string(), expected, "for `{}`", input);
+            if let Some(obj) = vm.last_popped_stack_elem() {
+                assert_eq!(&obj.to_string(), expected, "for `{}` {:?}", input, vm);
             } else {
                 panic!("no stack top on vm for `{} {:?}`", input, vm);
             }

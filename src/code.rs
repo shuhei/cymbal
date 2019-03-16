@@ -1,6 +1,10 @@
 // Instructions are a series of bytes.
 pub type Instructions = Vec<u8>;
 
+pub const OP_CONSTANT: u8 = 0;
+pub const OP_ADD: u8 = 1;
+pub const OP_POP: u8 = 2;
+
 pub fn print_instructions(insts: &Instructions) -> String {
     let mut result = String::new();
     let mut i = 0;
@@ -26,9 +30,6 @@ pub fn print_instructions(insts: &Instructions) -> String {
     result
 }
 
-pub const OP_CONSTANT: u8 = 0;
-pub const OP_ADD: u8 = 1;
-
 pub fn constant(i: u16) -> Vec<u8> {
     let bytes = i.to_be_bytes();
     vec![OP_CONSTANT, bytes[0], bytes[1]]
@@ -36,6 +37,10 @@ pub fn constant(i: u16) -> Vec<u8> {
 
 pub fn add() -> Vec<u8> {
     vec![OP_ADD]
+}
+
+pub fn pop() -> Vec<u8> {
+    vec![OP_POP]
 }
 
 pub fn read_operands(def: &Definition, insts: &Instructions, start: usize) -> (Vec<usize>, usize) {
@@ -70,6 +75,10 @@ pub fn lookup(op_code: u8) -> Option<Definition> {
         }),
         OP_ADD => Some(Definition {
             name: "OpAdd".to_string(),
+            widths: vec![],
+        }),
+        OP_POP => Some(Definition {
+            name: "OpPop".to_string(),
             widths: vec![],
         }),
         _ => None,

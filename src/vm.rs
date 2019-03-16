@@ -1,5 +1,5 @@
 use crate::code;
-use crate::code::{Instructions, OP_ADD, OP_CONSTANT};
+use crate::code::{Instructions, OP_ADD, OP_CONSTANT, OP_POP};
 use crate::compiler::Bytecode;
 use crate::object::Object;
 use std::fmt;
@@ -55,6 +55,8 @@ impl Vm {
                         return Err(VmError::TypeMismatch(l.clone(), r.clone()));
                     }
                 }
+            } else if op == OP_POP {
+                self.pop()?;
             }
             ip += 1;
         }
@@ -65,23 +67,24 @@ impl Vm {
         if self.sp >= STACK_SIZE {
             return Err(VmError::StackOverflow);
         }
-        self.stack.push(obj);
+        if self.sp < self.stack.len() {
+            self.stack[self.sp] = obj;
+        } else {
+            // `Vec` doesn't allow index assignment if the index is not filled yet.
+            self.stack.push(obj);
+        }
         self.sp += 1;
         Ok(())
     }
 
     fn pop(&mut self) -> Result<Rc<Object>, VmError> {
-        let popped = self.stack.pop();
+        let popped = self.stack.get(self.sp - 1);
         self.sp -= 1;
-        popped.ok_or(VmError::StackEmpty)
+        popped.map(|o| Rc::clone(o)).ok_or(VmError::StackEmpty)
     }
 
-    pub fn stack_top(&self) -> Option<Rc<Object>> {
-        if self.sp > 0 {
-            self.stack.get(self.sp - 1).map(|o| Rc::clone(o))
-        } else {
-            None
-        }
+    pub fn last_popped_stack_elem(&self) -> Option<Rc<Object>> {
+        self.stack.get(self.sp).map(|o| Rc::clone(o))
     }
 }
 

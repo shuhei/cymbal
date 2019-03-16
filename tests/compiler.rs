@@ -27,7 +27,8 @@ mod evalator_tests {
             vec![Object::Integer(1), Object::Integer(2)],
             "0000 OpConstant 0
 0003 OpConstant 1
-0006 OpAdd",
+0006 OpAdd
+0007 OpPop",
         )]);
     }
 

@@ -71,7 +71,7 @@ pub fn start(mode: Mode) {
                     }
                     _ => {}
                 }
-                if let Some(result) = vm.stack_top() {
+                if let Some(result) = vm.last_popped_stack_elem() {
                     println!("{}", result);
                 }
             }

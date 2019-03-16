@@ -27,7 +27,10 @@ impl Compiler {
 
     pub fn compile_statement(&mut self, statement: &Statement) -> Result<(), CompileError> {
         match statement {
-            Statement::Expression(exp) => self.compile_expression(exp)?,
+            Statement::Expression(exp) => {
+                self.compile_expression(exp)?;
+                self.add_instruction(code::pop());
+            },
             _ => {}
         }
         Ok(())
