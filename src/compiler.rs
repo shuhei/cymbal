@@ -1,11 +1,13 @@
 use crate::ast::{Expression, Program, Statement};
-use crate::code::{Instructions, OpCode};
+use crate::code;
+use crate::code::{Instructions};
 use crate::object::Object;
 use std::fmt;
+use std::rc::Rc;
 
 pub struct Compiler {
     pub instructions: Instructions,
-    pub constants: Vec<Object>,
+    pub constants: Vec<Rc<Object>>,
 }
 
 impl Compiler {
@@ -38,21 +40,24 @@ impl Compiler {
                 self.compile_expression(right)?;
             }
             Expression::IntegerLiteral(value) => {
-                let constant = Object::Integer(*value);
-                let ins = OpCode::constant(self.add_constant(constant));
+                let constant = Rc::new(Object::Integer(*value));
+                let ins = code::constant(self.add_constant(constant));
                 self.add_instruction(ins);
             }
             Expression::StringLiteral(value) => {
-                self.constants.push(Object::String(value.clone()));
+                let constant = Rc::new(Object::String(value.clone()));
+                let ins = code::constant(self.add_constant(constant));
+                self.add_instruction(ins);
             }
             _ => {}
         }
         Ok(())
     }
 
-    fn add_constant(&mut self, constant: Object) -> usize {
+    fn add_constant(&mut self, constant: Rc<Object>) -> u16 {
         self.constants.push(constant);
-        self.constants.len() - 1
+        // TODO: Check the limit
+        (self.constants.len() - 1) as u16
     }
 
     fn add_instruction(&mut self, ins: Vec<u8>) -> usize {
@@ -83,5 +88,5 @@ impl fmt::Display for CompileError {
 
 pub struct Bytecode {
     pub instructions: Instructions,
-    pub constants: Vec<Object>,
+    pub constants: Vec<Rc<Object>>,
 }

@@ -3,19 +3,15 @@ extern crate cymbal;
 #[cfg(test)]
 mod evalator_tests {
     use cymbal::code;
-    use cymbal::code::OpCode;
     use cymbal::compiler::Compiler;
     use cymbal::lexer::Lexer;
     use cymbal::object::Object;
     use cymbal::parser::Parser;
+    use std::borrow::Borrow;
 
     #[test]
     fn print_instructions() {
-        let insts = vec![
-            OpCode::constant(1),
-            OpCode::constant(2),
-            OpCode::constant(65535),
-        ];
+        let insts = vec![code::constant(1), code::constant(2), code::constant(65535)];
         let expected = "0000 OpConstant 1
 0003 OpConstant 2
 0006 OpConstant 65535";
@@ -27,10 +23,7 @@ mod evalator_tests {
     fn compile() {
         test_compile(vec![(
             "1 + 2",
-            vec![
-                Object::Integer(1),
-                Object::Integer(2),
-            ],
+            vec![Object::Integer(1), Object::Integer(2)],
             "0000 OpConstant 0
 0003 OpConstant 1",
         )]);
@@ -55,7 +48,12 @@ mod evalator_tests {
                 code::print_instructions(&bytecode.instructions),
                 expected_instructions
             );
-            assert_eq!(bytecode.constants, expected_constants);
+            // TODO: Better way?
+            let constants = bytecode.constants.iter().map(|c| {
+                let con: &Object = (*c).borrow();
+                con.clone()
+            }).collect::<Vec<Object>>();
+            assert_eq!(constants, expected_constants);
         }
     }
 

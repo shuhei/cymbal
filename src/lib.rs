@@ -7,3 +7,4 @@ pub mod object;
 pub mod evaluator;
 pub mod code;
 pub mod compiler;
+pub mod vm;

@@ -5,15 +5,15 @@ pub fn print_instructions(insts: &Instructions) -> String {
     let mut result = String::new();
     let mut i = 0;
     while i < insts.len() {
-        // TODO: Use `From` trait, or check if it's a valid op code.
-        if let Some(op_code) = OpCode::from_byte(insts[i]) {
+        let op_code = insts[i];
+        if let Some(def) = lookup(op_code) {
             if i > 0 {
                 result.push('\n');
             }
             result.push_str(&format!("{:04} ", i));
             i += 1;
-            let (operands, offset) = op_code.read_operands(insts, i);
-            result.push_str(&format!("{}", op_code.name()));
+            let (operands, offset) = read_operands(&def, insts, i);
+            result.push_str(&format!("{}", def.name));
             for operand in operands {
                 result.push_str(&format!(" {}", operand));
             }
@@ -26,52 +26,43 @@ pub fn print_instructions(insts: &Instructions) -> String {
     result
 }
 
-pub enum OpCode {
-    Constant = 0,
+pub const OP_CONSTANT: u8 = 0;
+
+pub fn constant(i: u16) -> Vec<u8> {
+    let bytes = i.to_be_bytes();
+    vec![OP_CONSTANT, bytes[0], bytes[1]]
 }
 
-impl OpCode {
-    pub fn from_byte(byte: u8) -> Option<OpCode> {
-        if byte == (OpCode::Constant as u8) {
-            Some(OpCode::Constant)
-        } else {
-            None
-        }
-    }
-
-    pub fn constant(i: usize) -> Vec<u8> {
-        let bytes = (i as u16).to_be_bytes();
-        vec![OpCode::Constant as u8, bytes[0], bytes[1]]
-    }
-
-    pub fn name(&self) -> String {
-        match self {
-            OpCode::Constant => "OpConstant".to_string()
-        }
-    }
-
-    pub fn widths(&self) -> Vec<usize> {
-        match self {
-            OpCode::Constant => vec![2],
-        }
-    }
-
-    pub fn read_operands(&self, insts: &Instructions, start: usize) -> (Vec<usize>, usize) {
-        let widths = self.widths();
-        let mut offset = 0;
-        let mut operands = Vec::with_capacity(widths.len());
-        for width in widths {
-            match width {
-                2 => {
-                    operands.push(u16::from_be_bytes([
-                        insts[start + offset],
-                        insts[start + offset + 1],
-                    ]) as usize);
-                }
-                _ => {}
+pub fn read_operands(def: &Definition, insts: &Instructions, start: usize) -> (Vec<usize>, usize) {
+    let mut offset = 0;
+    let mut operands = Vec::with_capacity(def.widths.len());
+    for width in &def.widths {
+        match width {
+            2 => {
+                operands.push(read_uint16(insts, start + offset) as usize);
             }
-            offset += width;
+            _ => {}
         }
-        (operands, offset)
+        offset += width;
+    }
+    (operands, offset)
+}
+
+pub fn read_uint16(insts: &Instructions, start: usize) -> u16 {
+    u16::from_be_bytes([insts[start], insts[start + 1]])
+}
+
+pub struct Definition {
+    pub name: String,
+    pub widths: Vec<usize>,
+}
+
+pub fn lookup(op_code: u8) -> Option<Definition> {
+    match op_code {
+        OP_CONSTANT => Some(Definition {
+            name: "OpConstant".to_string(),
+            widths: vec![2],
+        }),
+        _ => None,
     }
 }
