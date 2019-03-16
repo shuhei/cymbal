@@ -37,7 +37,7 @@ impl Vm {
 
                 if const_index < self.constants.len() {
                     let constant = Rc::clone(&self.constants[const_index]);
-                    self.push(constant);
+                    self.push(constant)?;
                 } else {
                     return Err(VmError::InvalidConstIndex(
                         const_index,
@@ -50,9 +50,13 @@ impl Vm {
         Ok(())
     }
 
-    fn push(&mut self, obj: Rc<Object>) {
+    fn push(&mut self, obj: Rc<Object>) -> Result<(), VmError> {
+        if self.sp >= STACK_SIZE {
+            return Err(VmError::StackOverflow);
+        }
         self.stack.push(obj);
         self.sp += 1;
+        Ok(())
     }
 
     pub fn stack_top(&self) -> Option<Rc<Object>> {
@@ -66,6 +70,7 @@ impl Vm {
 
 pub enum VmError {
     InvalidConstIndex(usize, usize),
+    StackOverflow,
 }
 
 impl fmt::Display for VmError {
@@ -74,6 +79,7 @@ impl fmt::Display for VmError {
             VmError::InvalidConstIndex(given, length) => {
                 write!(f, "invalid const index: {} / {}", given, length)
             }
+            VmError::StackOverflow => write!(f, "stack overflow"),
         }
     }
 }
