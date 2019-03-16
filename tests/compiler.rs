@@ -7,6 +7,7 @@ mod evalator_tests {
     use cymbal::lexer::Lexer;
     use cymbal::object::Object;
     use cymbal::parser::Parser;
+    use cymbal::ast::Program;
     use std::borrow::Borrow;
 
     #[test]
@@ -30,13 +31,16 @@ mod evalator_tests {
         )]);
     }
 
+    #[test]
+    fn compile_error() {
+        test_compile_error(vec![
+            ("1 - 2", "unknown operator: -")
+        ]);
+    }
+
     fn test_compile(tests: Vec<(&str, Vec<Object>, &str)>) {
         for (input, expected_constants, expected_instructions) in tests {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
-
-            let program = parser.parse_program();
-            check_parser_errors(&parser);
+            let program = parse(input);
 
             let mut compiler = Compiler::new();
             match compiler.compile(&program) {
@@ -56,6 +60,29 @@ mod evalator_tests {
             }).collect::<Vec<Object>>();
             assert_eq!(constants, expected_constants);
         }
+    }
+
+    fn test_compile_error(tests: Vec<(&str, &str)>) {
+        for (input, expected_error) in tests {
+            let program = parse(input);
+
+            let mut compiler = Compiler::new();
+            match compiler.compile(&program) {
+                Err(error) => {
+                    assert_eq!(error.to_string(), expected_error)
+                }
+                _ => panic!("expected compile error for `{}`", input)
+            }
+        }
+    }
+
+    fn parse(input: &str) -> Program {
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+        program
     }
 
     fn check_parser_errors(parser: &Parser) {

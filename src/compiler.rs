@@ -1,6 +1,6 @@
-use crate::ast::{Expression, Program, Statement};
+use crate::ast::{Expression, Infix, Program, Statement};
 use crate::code;
-use crate::code::{Instructions};
+use crate::code::Instructions;
 use crate::object::Object;
 use std::fmt;
 use std::rc::Rc;
@@ -35,10 +35,17 @@ impl Compiler {
 
     pub fn compile_expression(&mut self, expression: &Expression) -> Result<(), CompileError> {
         match expression {
-            Expression::Infix(_, left, right) => {
+            Expression::Infix(infix, left, right) => {
                 self.compile_expression(left)?;
                 self.compile_expression(right)?;
-                self.add_instruction(code::add());
+                match infix {
+                    Infix::Plus => {
+                        self.add_instruction(code::add());
+                    }
+                    inf => {
+                        return Err(CompileError::UnknownOperator(inf.clone()));
+                    }
+                }
             }
             Expression::IntegerLiteral(value) => {
                 let constant = Rc::new(Object::Integer(*value));
@@ -76,13 +83,13 @@ impl Compiler {
 }
 
 pub enum CompileError {
-    Foo,
+    UnknownOperator(Infix),
 }
 
 impl fmt::Display for CompileError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            CompileError::Foo => write!(f, "foo"),
+            CompileError::UnknownOperator(infix) => write!(f, "unknown operator: {}", infix),
         }
     }
 }
