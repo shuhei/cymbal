@@ -9,7 +9,11 @@ Yet another Rust implementation of the Monkey language from "Writing an Interpre
 Start REPL:
 
 ```sh
+# Run in eval mode to directly evaluate AST
 cargo run
+
+# Run in compile mode to compile AST into bytecode and execute it on VM
+cargo run --compile
 ```
 
 Build:
