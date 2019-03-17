@@ -58,12 +58,27 @@ mod compiler_tests {
                 vec![],
                 "0000 OpFalse\n0001 OpPop",
             ),
+            (
+                "1 == 2",
+                vec![Object::Integer(1), Object::Integer(2)],
+                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpEqual\n0007 OpPop",
+            ),
+            (
+                "1 != 2",
+                vec![Object::Integer(1), Object::Integer(2)],
+                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpNotEqual\n0007 OpPop",
+            ),
+            (
+                "1 > 2",
+                vec![Object::Integer(1), Object::Integer(2)],
+                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpGreaterThan\n0007 OpPop",
+            ),
+            (
+                "1 < 2",
+                vec![Object::Integer(2), Object::Integer(1)],
+                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpGreaterThan\n0007 OpPop",
+            )
         ]);
-    }
-
-    #[test]
-    fn compile_error() {
-        test_compile_error(vec![("1 == 2", "unknown operator: ==")]);
     }
 
     fn test_compile(tests: Vec<(&str, Vec<Object>, &str)>) {
@@ -91,18 +106,6 @@ mod compiler_tests {
                 })
                 .collect::<Vec<Object>>();
             assert_eq!(constants, expected_constants);
-        }
-    }
-
-    fn test_compile_error(tests: Vec<(&str, &str)>) {
-        for (input, expected_error) in tests {
-            let program = parse(input);
-
-            let mut compiler = Compiler::new();
-            match compiler.compile(&program) {
-                Err(error) => assert_eq!(error.to_string(), expected_error),
-                _ => panic!("expected compile error for `{}`", input),
-            }
         }
     }
 

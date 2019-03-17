@@ -67,6 +67,15 @@ impl Vm {
                 Some(OpCode::False) => {
                     self.push(Rc::new(Object::Boolean(false)))?;
                 }
+                Some(OpCode::Equal) => {
+                    self.execute_comparison(OpCode::Equal)?;
+                }
+                Some(OpCode::NotEqual) => {
+                    self.execute_comparison(OpCode::NotEqual)?;
+                }
+                Some(OpCode::GreaterThan) => {
+                    self.execute_comparison(OpCode::GreaterThan)?;
+                }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
                 }
@@ -83,13 +92,16 @@ impl Vm {
             (Object::Integer(l), Object::Integer(r)) => {
                 self.execute_integer_binary_operation(op_code, l, r)
             }
-            (l, r) => {
-                Err(VmError::TypeMismatch(l.clone(), r.clone()))
-            }
+            (l, r) => Err(VmError::TypeMismatch(l.clone(), r.clone())),
         }
     }
 
-    fn execute_integer_binary_operation(&mut self, op_code: OpCode, left: &i64, right: &i64) -> Result<(), VmError> {
+    fn execute_integer_binary_operation(
+        &mut self,
+        op_code: OpCode,
+        left: &i64,
+        right: &i64,
+    ) -> Result<(), VmError> {
         let result = match op_code {
             OpCode::Add => left + right,
             OpCode::Sub => left - right,
@@ -102,6 +114,40 @@ impl Vm {
         };
 
         self.push(Rc::new(Object::Integer(result)))
+    }
+
+    fn execute_comparison(&mut self, op_code: OpCode) -> Result<(), VmError> {
+        let right = self.pop()?;
+        let left = self.pop()?;
+
+        match (&*left, &*right) {
+            (Object::Integer(l), Object::Integer(r)) => {
+                match op_code {
+                    OpCode::Equal => self.push(Rc::new(Object::Boolean(l == r))),
+                    OpCode::NotEqual => self.push(Rc::new(Object::Boolean(l != r))),
+                    OpCode::GreaterThan => self.push(Rc::new(Object::Boolean(l > r))),
+                    _ => {
+                        // This happens only when this vm is wrong.
+                        panic!("unknown operator: {:?}", op_code);
+                    }
+                }
+            }
+            (Object::Boolean(l), Object::Boolean(r)) => {
+                match op_code {
+                    OpCode::Equal => self.push(Rc::new(Object::Boolean(l == r))),
+                    OpCode::NotEqual => self.push(Rc::new(Object::Boolean(l != r))),
+                    OpCode::GreaterThan => Err(VmError::TypeMismatch(
+                        Object::Boolean(*l),
+                        Object::Boolean(*r),
+                    )),
+                    _ => {
+                        // This happens only when this vm is wrong.
+                        panic!("unknown operator: {:?}", op_code);
+                    }
+                }
+            }
+            (l, r) => Err(VmError::TypeMismatch(l.clone(), r.clone())),
+        }
     }
 
     fn push(&mut self, obj: Rc<Object>) -> Result<(), VmError> {

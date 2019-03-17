@@ -38,8 +38,18 @@ impl Compiler {
     pub fn compile_expression(&mut self, expression: &Expression) -> Result<(), CompileError> {
         match expression {
             Expression::Infix(infix, left, right) => {
-                self.compile_expression(left)?;
-                self.compile_expression(right)?;
+                match infix {
+                    Infix::Lt => {
+                        // Convert `a < b` to `a > b` to keep the instruction set smaller.
+                        // TODO: This is an issue if expressions have side effects though.
+                        self.compile_expression(right)?;
+                        self.compile_expression(left)?;
+                    }
+                    _ => {
+                        self.compile_expression(left)?;
+                        self.compile_expression(right)?;
+                    }
+                }
                 match infix {
                     Infix::Plus => {
                         self.emit(OpCode::add());
@@ -53,8 +63,14 @@ impl Compiler {
                     Infix::Slash => {
                         self.emit(OpCode::div());
                     }
-                    inf => {
-                        return Err(CompileError::UnknownOperator(inf.clone()));
+                    Infix::Eq => {
+                        self.emit(OpCode::equal());
+                    }
+                    Infix::NotEq => {
+                        self.emit(OpCode::not_equal());
+                    }
+                    Infix::Gt | Infix::Lt => {
+                        self.emit(OpCode::greater_than());
                     }
                 }
             }

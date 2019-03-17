@@ -22,7 +22,28 @@ mod vm_tests {
             ("2 * 2 * 2 * 2 * 2", "32"),
             ("5 * 2 + 10", "20"),
             ("5 + 2 * 10", "25"),
-            ("5 * (2 + 10)", "60"),
+            ("1 == 1", "true"),
+            ("1 == 2", "false"),
+            ("1 != 1", "false"),
+            ("1 != 2", "true"),
+            ("1 > 2", "false"),
+            ("2 > 1", "true"),
+            ("1 < 2", "true"),
+            ("2 < 1", "false"),
+        ]);
+    }
+
+    #[test]
+    fn boolean() {
+        test_vm(vec![
+            ("true", "true"),
+            ("false", "false"),
+            ("true == true", "true"),
+            ("false == false", "true"),
+            ("true == false", "false"),
+            ("true != true", "false"),
+            ("false != false", "false"),
+            ("true != false", "true"),
         ]);
     }
 

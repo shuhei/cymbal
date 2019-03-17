@@ -53,7 +53,22 @@ macro_rules! byte_enum {
     };
 }
 
-byte_enum!(OpCode, [Constant, Pop, Add, Sub, Mul, Div, True, False]);
+byte_enum!(
+    OpCode,
+    [
+        Constant,
+        Pop,
+        Add,
+        Sub,
+        Mul,
+        Div,
+        True,
+        False,
+        Equal,
+        NotEqual,
+        GreaterThan
+    ]
+);
 
 impl OpCode {
     pub fn constant(i: u16) -> Vec<u8> {
@@ -87,6 +102,18 @@ impl OpCode {
 
     pub fn push_false() -> Vec<u8> {
         vec![OpCode::False as u8]
+    }
+
+    pub fn equal() -> Vec<u8> {
+        vec![OpCode::Equal as u8]
+    }
+
+    pub fn not_equal() -> Vec<u8> {
+        vec![OpCode::NotEqual as u8]
+    }
+
+    pub fn greater_than() -> Vec<u8> {
+        vec![OpCode::GreaterThan as u8]
     }
 }
 
@@ -171,6 +198,18 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
         },
         OpCode::False => Definition {
             name: "OpFalse".to_string(),
+            widths: vec![],
+        },
+        OpCode::Equal => Definition {
+            name: "OpEqual".to_string(),
+            widths: vec![],
+        },
+        OpCode::NotEqual => Definition {
+            name: "OpNotEqual".to_string(),
+            widths: vec![],
+        },
+        OpCode::GreaterThan => Definition {
+            name: "OpGreaterThan".to_string(),
             widths: vec![],
         },
     })
