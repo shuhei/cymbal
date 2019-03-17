@@ -66,7 +66,9 @@ byte_enum!(
         False,
         Equal,
         NotEqual,
-        GreaterThan
+        GreaterThan,
+        Minus,
+        Bang
     ]
 );
 
@@ -114,6 +116,14 @@ impl OpCode {
 
     pub fn greater_than() -> Vec<u8> {
         vec![OpCode::GreaterThan as u8]
+    }
+
+    pub fn minus() -> Vec<u8> {
+        vec![OpCode::Minus as u8]
+    }
+
+    pub fn bang() -> Vec<u8> {
+        vec![OpCode::Bang as u8]
     }
 }
 
@@ -210,6 +220,14 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
         },
         OpCode::GreaterThan => Definition {
             name: "OpGreaterThan".to_string(),
+            widths: vec![],
+        },
+        OpCode::Minus => Definition {
+            name: "OpMinus".to_string(),
+            widths: vec![],
+        },
+        OpCode::Bang => Definition {
+            name: "OpBang".to_string(),
             widths: vec![],
         },
     })

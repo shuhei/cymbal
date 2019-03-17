@@ -47,6 +47,31 @@ mod vm_tests {
         ]);
     }
 
+    #[test]
+    fn prefix_minus() {
+        test_vm(vec![
+            ("-123", "-123"),
+            ("-(1 + 3)", "-4"),
+            ("-(10 - 23)", "13"),
+        ]);
+    }
+
+    #[test]
+    fn prefix_bang() {
+        test_vm(vec![
+            ("!true", "false"),
+            ("!false", "true"),
+            ("!0", "false"),
+            ("!123", "false"),
+            ("!-123", "false"),
+            ("!!true", "true"),
+            ("!!false", "false"),
+            ("!!0", "true"),
+            ("!!123", "true"),
+            ("!!-123", "true"),
+        ]);
+    }
+
     fn test_vm(tests: Vec<(&str, &str)>) {
         for (input, expected) in tests {
             let lexer = Lexer::new(input);

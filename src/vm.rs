@@ -1,3 +1,4 @@
+use crate::ast::{Infix, Prefix};
 use crate::code;
 use crate::code::{Instructions, OpCode};
 use crate::compiler::Bytecode;
@@ -76,6 +77,28 @@ impl Vm {
                 Some(OpCode::GreaterThan) => {
                     self.execute_comparison(OpCode::GreaterThan)?;
                 }
+                Some(OpCode::Minus) => {
+                    let right = self.pop()?;
+                    match &*right {
+                        Object::Integer(value) => {
+                            self.push(Rc::new(Object::Integer(-value)))?;
+                        }
+                        obj => {
+                            return Err(VmError::UnsupportedPrefix(Prefix::Minus, obj.clone()));
+                        }
+                    }
+                }
+                Some(OpCode::Bang) => {
+                    let right = self.pop()?;
+                    match &*right {
+                        Object::Boolean(value) => {
+                            self.push(Rc::new(Object::Boolean(!value)))?;
+                        }
+                        _ => {
+                            self.push(Rc::new(Object::Boolean(false)))?;
+                        }
+                    }
+                }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
                 }
@@ -136,7 +159,8 @@ impl Vm {
                 match op_code {
                     OpCode::Equal => self.push(Rc::new(Object::Boolean(l == r))),
                     OpCode::NotEqual => self.push(Rc::new(Object::Boolean(l != r))),
-                    OpCode::GreaterThan => Err(VmError::TypeMismatch(
+                    OpCode::GreaterThan => Err(VmError::UnsupportedInfix(
+                        Infix::Gt,
                         Object::Boolean(*l),
                         Object::Boolean(*r),
                     )),
@@ -181,6 +205,8 @@ pub enum VmError {
     StackOverflow,
     StackEmpty,
     TypeMismatch(Object, Object),
+    UnsupportedInfix(Infix, Object, Object),
+    UnsupportedPrefix(Prefix, Object),
 }
 
 impl fmt::Display for VmError {
@@ -194,10 +220,20 @@ impl fmt::Display for VmError {
             VmError::StackEmpty => write!(f, "stack empty"),
             VmError::TypeMismatch(left, right) => write!(
                 f,
-                "type mismatch {} {}",
+                "type mismatch: {} {}",
                 left.type_name(),
                 right.type_name()
             ),
+            VmError::UnsupportedInfix(infix, left, right) => write!(
+                f,
+                "unsupported infix: {} {} {}",
+                left.type_name(),
+                infix,
+                right.type_name()
+            ),
+            VmError::UnsupportedPrefix(prefix, right) => {
+                write!(f, "unsupported prefix: {} {}", prefix, right.type_name())
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Infix, Program, Statement};
+use crate::ast::{Expression, Infix, Prefix, Program, Statement};
 use crate::code::{Instructions, OpCode};
 use crate::object::Object;
 use std::fmt;
@@ -71,6 +71,18 @@ impl Compiler {
                     }
                     Infix::Gt | Infix::Lt => {
                         self.emit(OpCode::greater_than());
+                    }
+                }
+            }
+            Expression::Prefix(prefix, right) => {
+                self.compile_expression(right)?;
+
+                match prefix {
+                    Prefix::Bang => {
+                        self.emit(OpCode::bang());
+                    }
+                    Prefix::Minus => {
+                        self.emit(OpCode::minus());
                     }
                 }
             }

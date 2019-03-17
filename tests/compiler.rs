@@ -81,6 +81,14 @@ mod compiler_tests {
         ]);
     }
 
+    #[test]
+    fn prefix_expression() {
+        test_compile(vec![
+            ("!true", vec![], "0000 OpTrue\n0001 OpBang\n0002 OpPop"),
+            ("-123", vec![Object::Integer(123)], "0000 OpConstant 0\n0003 OpMinus\n0004 OpPop"),
+        ]);
+    }
+
     fn test_compile(tests: Vec<(&str, Vec<Object>, &str)>) {
         for (input, expected_constants, expected_instructions) in tests {
             let program = parse(input);
