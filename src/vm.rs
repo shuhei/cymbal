@@ -46,20 +46,20 @@ impl Vm {
                         ));
                     }
                 }
-                Some(OpCode::Add) => {
-                    let right = self.pop()?;
-                    let left = self.pop()?;
-                    match (&*left, &*right) {
-                        (Object::Integer(l), Object::Integer(r)) => {
-                            self.push(Rc::new(Object::Integer(l + r)))?;
-                        }
-                        (l, r) => {
-                            return Err(VmError::TypeMismatch(l.clone(), r.clone()));
-                        }
-                    }
-                }
                 Some(OpCode::Pop) => {
                     self.pop()?;
+                }
+                Some(OpCode::Add) => {
+                    self.execute_binary_operation(OpCode::Add)?;
+                }
+                Some(OpCode::Sub) => {
+                    self.execute_binary_operation(OpCode::Sub)?;
+                }
+                Some(OpCode::Mul) => {
+                    self.execute_binary_operation(OpCode::Mul)?;
+                }
+                Some(OpCode::Div) => {
+                    self.execute_binary_operation(OpCode::Div)?;
                 }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
@@ -68,6 +68,34 @@ impl Vm {
             ip += 1;
         }
         Ok(())
+    }
+
+    fn execute_binary_operation(&mut self, op_code: OpCode) -> Result<(), VmError> {
+        let right = self.pop()?;
+        let left = self.pop()?;
+        match (&*left, &*right) {
+            (Object::Integer(l), Object::Integer(r)) => {
+                self.execute_integer_binary_operation(op_code, l, r)
+            }
+            (l, r) => {
+                Err(VmError::TypeMismatch(l.clone(), r.clone()))
+            }
+        }
+    }
+
+    fn execute_integer_binary_operation(&mut self, op_code: OpCode, left: &i64, right: &i64) -> Result<(), VmError> {
+        let result = match op_code {
+            OpCode::Add => left + right,
+            OpCode::Sub => left - right,
+            OpCode::Mul => left * right,
+            OpCode::Div => left / right,
+            _ => {
+                // This happens only when this vm is wrong.
+                panic!("not integer binary operation: {:?}", op_code);
+            }
+        };
+
+        self.push(Rc::new(Object::Integer(result)))
     }
 
     fn push(&mut self, obj: Rc<Object>) -> Result<(), VmError> {

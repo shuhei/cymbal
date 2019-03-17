@@ -13,6 +13,16 @@ mod vm_tests {
             ("1", "1"),
             ("2", "2"),
             ("1 + 2", "3"),
+            ("1 - 2", "-1"),
+            ("2 * 3", "6"),
+            ("4 / 2", "2"),
+            ("50 / 2 * 2 + 10 - 5", "55"),
+            ("5 * (2 + 10)", "60"),
+            ("5 + 5 + 5 + 5 - 10", "10"),
+            ("2 * 2 * 2 * 2 * 2", "32"),
+            ("5 * 2 + 10", "20"),
+            ("5 + 2 * 10", "25"),
+            ("5 * (2 + 10)", "60"),
         ]);
     }
 
@@ -21,6 +31,15 @@ mod vm_tests {
             let lexer = Lexer::new(input);
             let mut parser = Parser::new(lexer);
             let program = parser.parse_program();
+            let errors = parser.errors();
+            if errors.len() > 0 {
+                panic!(
+                    "for input '{}', got parser errors: {:?}",
+                    input,
+                    errors
+                );
+            }
+
             let mut compiler = Compiler::new();
             match compiler.compile(&program) {
                 Err(err) => {

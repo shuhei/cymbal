@@ -39,6 +39,7 @@ macro_rules! byte_enum {
         byte_enum!(@step $idx + 1u8, $name, $byte, [$($tail,)*]);
     };
     ($name:ident, [$($var: ident),+]) => {
+        #[derive(Debug)]
         #[repr(u8)]
         pub enum $name {
             $($var,)+
@@ -52,7 +53,34 @@ macro_rules! byte_enum {
     };
 }
 
-byte_enum!(OpCode, [Constant, Pop, Add]);
+byte_enum!(OpCode, [Constant, Pop, Add, Sub, Mul, Div]);
+
+impl OpCode {
+    pub fn constant(i: u16) -> Vec<u8> {
+        let bytes = i.to_be_bytes();
+        vec![OpCode::Constant as u8, bytes[0], bytes[1]]
+    }
+
+    pub fn pop() -> Vec<u8> {
+        vec![OpCode::Pop as u8]
+    }
+
+    pub fn add() -> Vec<u8> {
+        vec![OpCode::Add as u8]
+    }
+
+    pub fn sub() -> Vec<u8> {
+        vec![OpCode::Sub as u8]
+    }
+
+    pub fn mul() -> Vec<u8> {
+        vec![OpCode::Mul as u8]
+    }
+
+    pub fn div() -> Vec<u8> {
+        vec![OpCode::Div as u8]
+    }
+}
 
 pub fn print_instructions(insts: &Instructions) -> String {
     let mut result = String::new();
@@ -79,19 +107,6 @@ pub fn print_instructions(insts: &Instructions) -> String {
     result
 }
 
-pub fn constant(i: u16) -> Vec<u8> {
-    let bytes = i.to_be_bytes();
-    vec![OpCode::Constant as u8, bytes[0], bytes[1]]
-}
-
-pub fn add() -> Vec<u8> {
-    vec![OpCode::Add as u8]
-}
-
-pub fn pop() -> Vec<u8> {
-    vec![OpCode::Pop as u8]
-}
-
 pub fn read_operands(def: &Definition, insts: &Instructions, start: usize) -> (Vec<usize>, usize) {
     let mut offset = 0;
     let mut operands = Vec::with_capacity(def.widths.len());
@@ -116,20 +131,31 @@ pub struct Definition {
     pub widths: Vec<usize>,
 }
 
-fn lookup_definition(op_code: u8) -> Option<Definition> {
-    match OpCode::from_byte(op_code) {
-        Some(OpCode::Constant) => Some(Definition {
+fn lookup_definition(byte: u8) -> Option<Definition> {
+    OpCode::from_byte(byte).map(|op_code| match op_code {
+        OpCode::Constant => Definition {
             name: "OpConstant".to_string(),
             widths: vec![2],
-        }),
-        Some(OpCode::Add) => Some(Definition {
-            name: "OpAdd".to_string(),
-            widths: vec![],
-        }),
-        Some(OpCode::Pop) => Some(Definition {
+        },
+        OpCode::Pop => Definition {
             name: "OpPop".to_string(),
             widths: vec![],
-        }),
-        _ => None,
-    }
+        },
+        OpCode::Add => Definition {
+            name: "OpAdd".to_string(),
+            widths: vec![],
+        },
+        OpCode::Sub => Definition {
+            name: "OpSub".to_string(),
+            widths: vec![],
+        },
+        OpCode::Mul => Definition {
+            name: "OpMul".to_string(),
+            widths: vec![],
+        },
+        OpCode::Div => Definition {
+            name: "OpDiv".to_string(),
+            widths: vec![],
+        },
+    })
 }

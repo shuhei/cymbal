@@ -1,18 +1,23 @@
 extern crate cymbal;
 
 #[cfg(test)]
-mod evalator_tests {
+mod compiler_tests {
+    use cymbal::ast::Program;
     use cymbal::code;
+    use cymbal::code::OpCode;
     use cymbal::compiler::Compiler;
     use cymbal::lexer::Lexer;
     use cymbal::object::Object;
     use cymbal::parser::Parser;
-    use cymbal::ast::Program;
     use std::borrow::Borrow;
 
     #[test]
     fn print_instructions() {
-        let insts = vec![code::constant(1), code::constant(2), code::constant(65535)];
+        let insts = vec![
+            OpCode::constant(1),
+            OpCode::constant(2),
+            OpCode::constant(65535),
+        ];
         let expected = "0000 OpConstant 1
 0003 OpConstant 2
 0006 OpConstant 65535";
@@ -22,21 +27,33 @@ mod evalator_tests {
 
     #[test]
     fn compile() {
-        test_compile(vec![(
-            "1 + 2",
-            vec![Object::Integer(1), Object::Integer(2)],
-            "0000 OpConstant 0
-0003 OpConstant 1
-0006 OpAdd
-0007 OpPop",
-        )]);
+        test_compile(vec![
+            (
+                "1 + 2",
+                vec![Object::Integer(1), Object::Integer(2)],
+                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpAdd\n0007 OpPop",
+            ),
+            (
+                "1 - 2",
+                vec![Object::Integer(1), Object::Integer(2)],
+                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpSub\n0007 OpPop",
+            ),
+            (
+                "1 * 2",
+                vec![Object::Integer(1), Object::Integer(2)],
+                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpMul\n0007 OpPop",
+            ),
+            (
+                "2 / 1",
+                vec![Object::Integer(2), Object::Integer(1)],
+                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpDiv\n0007 OpPop",
+            ),
+        ]);
     }
 
     #[test]
     fn compile_error() {
-        test_compile_error(vec![
-            ("1 - 2", "unknown operator: -")
-        ]);
+        test_compile_error(vec![("1 == 2", "unknown operator: ==")]);
     }
 
     fn test_compile(tests: Vec<(&str, Vec<Object>, &str)>) {
@@ -55,10 +72,14 @@ mod evalator_tests {
                 expected_instructions
             );
             // TODO: Better way?
-            let constants = bytecode.constants.iter().map(|c| {
-                let con: &Object = (*c).borrow();
-                con.clone()
-            }).collect::<Vec<Object>>();
+            let constants = bytecode
+                .constants
+                .iter()
+                .map(|c| {
+                    let con: &Object = (*c).borrow();
+                    con.clone()
+                })
+                .collect::<Vec<Object>>();
             assert_eq!(constants, expected_constants);
         }
     }
@@ -69,10 +90,8 @@ mod evalator_tests {
 
             let mut compiler = Compiler::new();
             match compiler.compile(&program) {
-                Err(error) => {
-                    assert_eq!(error.to_string(), expected_error)
-                }
-                _ => panic!("expected compile error for `{}`", input)
+                Err(error) => assert_eq!(error.to_string(), expected_error),
+                _ => panic!("expected compile error for `{}`", input),
             }
         }
     }

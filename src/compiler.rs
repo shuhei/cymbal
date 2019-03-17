@@ -1,6 +1,5 @@
 use crate::ast::{Expression, Infix, Program, Statement};
-use crate::code;
-use crate::code::Instructions;
+use crate::code::{Instructions, OpCode};
 use crate::object::Object;
 use std::fmt;
 use std::rc::Rc;
@@ -29,8 +28,8 @@ impl Compiler {
         match statement {
             Statement::Expression(exp) => {
                 self.compile_expression(exp)?;
-                self.add_instruction(code::pop());
-            },
+                self.add_instruction(OpCode::pop());
+            }
             _ => {}
         }
         Ok(())
@@ -43,7 +42,16 @@ impl Compiler {
                 self.compile_expression(right)?;
                 match infix {
                     Infix::Plus => {
-                        self.add_instruction(code::add());
+                        self.add_instruction(OpCode::add());
+                    }
+                    Infix::Minus => {
+                        self.add_instruction(OpCode::sub());
+                    }
+                    Infix::Asterisk => {
+                        self.add_instruction(OpCode::mul());
+                    }
+                    Infix::Slash => {
+                        self.add_instruction(OpCode::div());
                     }
                     inf => {
                         return Err(CompileError::UnknownOperator(inf.clone()));
@@ -52,12 +60,12 @@ impl Compiler {
             }
             Expression::IntegerLiteral(value) => {
                 let constant = Rc::new(Object::Integer(*value));
-                let ins = code::constant(self.add_constant(constant));
+                let ins = OpCode::constant(self.add_constant(constant));
                 self.add_instruction(ins);
             }
             Expression::StringLiteral(value) => {
                 let constant = Rc::new(Object::String(value.clone()));
-                let ins = code::constant(self.add_constant(constant));
+                let ins = OpCode::constant(self.add_constant(constant));
                 self.add_instruction(ins);
             }
             _ => {}
