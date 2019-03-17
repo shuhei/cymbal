@@ -53,7 +53,7 @@ macro_rules! byte_enum {
     };
 }
 
-byte_enum!(OpCode, [Constant, Pop, Add, Sub, Mul, Div]);
+byte_enum!(OpCode, [Constant, Pop, Add, Sub, Mul, Div, True, False]);
 
 impl OpCode {
     pub fn constant(i: u16) -> Vec<u8> {
@@ -79,6 +79,14 @@ impl OpCode {
 
     pub fn div() -> Vec<u8> {
         vec![OpCode::Div as u8]
+    }
+
+    pub fn push_true() -> Vec<u8> {
+        vec![OpCode::True as u8]
+    }
+
+    pub fn push_false() -> Vec<u8> {
+        vec![OpCode::False as u8]
     }
 }
 
@@ -155,6 +163,14 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
         },
         OpCode::Div => Definition {
             name: "OpDiv".to_string(),
+            widths: vec![],
+        },
+        OpCode::True => Definition {
+            name: "OpTrue".to_string(),
+            widths: vec![],
+        },
+        OpCode::False => Definition {
+            name: "OpFalse".to_string(),
             widths: vec![],
         },
     })

@@ -61,6 +61,12 @@ impl Vm {
                 Some(OpCode::Div) => {
                     self.execute_binary_operation(OpCode::Div)?;
                 }
+                Some(OpCode::True) => {
+                    self.push(Rc::new(Object::Boolean(true)))?;
+                }
+                Some(OpCode::False) => {
+                    self.push(Rc::new(Object::Boolean(false)))?;
+                }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
                 }

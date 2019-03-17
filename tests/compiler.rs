@@ -48,6 +48,16 @@ mod compiler_tests {
                 vec![Object::Integer(2), Object::Integer(1)],
                 "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpDiv\n0007 OpPop",
             ),
+            (
+                "true",
+                vec![],
+                "0000 OpTrue\n0001 OpPop",
+            ),
+            (
+                "false",
+                vec![],
+                "0000 OpFalse\n0001 OpPop",
+            ),
         ]);
     }
 

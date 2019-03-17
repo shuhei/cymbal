@@ -28,7 +28,7 @@ impl Compiler {
         match statement {
             Statement::Expression(exp) => {
                 self.compile_expression(exp)?;
-                self.add_instruction(OpCode::pop());
+                self.emit(OpCode::pop());
             }
             _ => {}
         }
@@ -42,16 +42,16 @@ impl Compiler {
                 self.compile_expression(right)?;
                 match infix {
                     Infix::Plus => {
-                        self.add_instruction(OpCode::add());
+                        self.emit(OpCode::add());
                     }
                     Infix::Minus => {
-                        self.add_instruction(OpCode::sub());
+                        self.emit(OpCode::sub());
                     }
                     Infix::Asterisk => {
-                        self.add_instruction(OpCode::mul());
+                        self.emit(OpCode::mul());
                     }
                     Infix::Slash => {
-                        self.add_instruction(OpCode::div());
+                        self.emit(OpCode::div());
                     }
                     inf => {
                         return Err(CompileError::UnknownOperator(inf.clone()));
@@ -61,12 +61,18 @@ impl Compiler {
             Expression::IntegerLiteral(value) => {
                 let constant = Rc::new(Object::Integer(*value));
                 let ins = OpCode::constant(self.add_constant(constant));
-                self.add_instruction(ins);
+                self.emit(ins);
+            }
+            Expression::Boolean(true) => {
+                self.emit(OpCode::push_true());
+            }
+            Expression::Boolean(false) => {
+                self.emit(OpCode::push_false());
             }
             Expression::StringLiteral(value) => {
                 let constant = Rc::new(Object::String(value.clone()));
                 let ins = OpCode::constant(self.add_constant(constant));
-                self.add_instruction(ins);
+                self.emit(ins);
             }
             _ => {}
         }
@@ -79,10 +85,8 @@ impl Compiler {
         (self.constants.len() - 1) as u16
     }
 
-    fn add_instruction(&mut self, ins: Vec<u8>) -> usize {
-        let width = ins.len();
+    fn emit(&mut self, ins: Vec<u8>) {
         self.instructions.extend(ins);
-        self.instructions.len() - width
     }
 
     pub fn bytecode(self) -> Bytecode {
