@@ -1,5 +1,5 @@
 use crate::code;
-use crate::code::{Instructions, OP_ADD, OP_CONSTANT, OP_POP};
+use crate::code::{Instructions, OpCode};
 use crate::compiler::Bytecode;
 use crate::object::Object;
 use std::fmt;
@@ -30,33 +30,37 @@ impl Vm {
         let mut ip = 0;
         while ip < self.instructions.len() {
             // Fetch
-            let op = self.instructions[ip];
-            if op == OP_CONSTANT {
-                let const_index = code::read_uint16(&self.instructions, ip + 1) as usize;
-                ip += 2;
+            match OpCode::from_byte(self.instructions[ip]) {
+                Some(OpCode::Constant) => {
+                    let const_index = code::read_uint16(&self.instructions, ip + 1) as usize;
+                    ip += 2;
 
-                if const_index < self.constants.len() {
-                    let constant = Rc::clone(&self.constants[const_index]);
-                    self.push(constant)?;
-                } else {
-                    return Err(VmError::InvalidConstIndex(
-                        const_index,
-                        self.constants.len(),
-                    ));
-                }
-            } else if op == OP_ADD {
-                let right = self.pop()?;
-                let left = self.pop()?;
-                match (&*left, &*right) {
-                    (Object::Integer(l), Object::Integer(r)) => {
-                        self.push(Rc::new(Object::Integer(l + r)))?;
-                    }
-                    (l, r) => {
-                        return Err(VmError::TypeMismatch(l.clone(), r.clone()));
+                    if const_index < self.constants.len() {
+                        let constant = Rc::clone(&self.constants[const_index]);
+                        self.push(constant)?;
+                    } else {
+                        return Err(VmError::InvalidConstIndex(
+                            const_index,
+                            self.constants.len(),
+                        ));
                     }
                 }
-            } else if op == OP_POP {
-                self.pop()?;
+                Some(OpCode::Add) => {
+                    let right = self.pop()?;
+                    let left = self.pop()?;
+                    match (&*left, &*right) {
+                        (Object::Integer(l), Object::Integer(r)) => {
+                            self.push(Rc::new(Object::Integer(l + r)))?;
+                        }
+                        (l, r) => {
+                            return Err(VmError::TypeMismatch(l.clone(), r.clone()));
+                        }
+                    }
+                }
+                Some(OpCode::Pop) => {
+                    self.pop()?;
+                }
+                None => {}
             }
             ip += 1;
         }
