@@ -30,7 +30,8 @@ impl Vm {
         let mut ip = 0;
         while ip < self.instructions.len() {
             // Fetch
-            match OpCode::from_byte(self.instructions[ip]) {
+            let op_code_byte = self.instructions[ip];
+            match OpCode::from_byte(op_code_byte) {
                 Some(OpCode::Constant) => {
                     let const_index = code::read_uint16(&self.instructions, ip + 1) as usize;
                     ip += 2;
@@ -60,7 +61,9 @@ impl Vm {
                 Some(OpCode::Pop) => {
                     self.pop()?;
                 }
-                None => {}
+                None => {
+                    return Err(VmError::UnknownOpCode(op_code_byte));
+                }
             }
             ip += 1;
         }
@@ -93,6 +96,7 @@ impl Vm {
 }
 
 pub enum VmError {
+    UnknownOpCode(u8),
     InvalidConstIndex(usize, usize),
     StackOverflow,
     StackEmpty,
@@ -102,6 +106,7 @@ pub enum VmError {
 impl fmt::Display for VmError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            VmError::UnknownOpCode(op_code) => write!(f, "unknown op code: {}", op_code),
             VmError::InvalidConstIndex(given, length) => {
                 write!(f, "invalid const index: {} / {}", given, length)
             }
