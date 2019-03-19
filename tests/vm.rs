@@ -72,6 +72,19 @@ mod vm_tests {
         ]);
     }
 
+    #[test]
+    fn if_expression() {
+        test_vm(vec![
+            ("if (true) { 10 }", "10"),
+            ("if (true) { 10 } else { 20 }", "10"),
+            ("if (false) { 10 } else { 20 }", "20"),
+            ("if (1) { 10 }", "10"),
+            ("if (1 < 2) { 10 }", "10"),
+            ("if (1 < 2) { 10 } else { 20 }", "10"),
+            ("if (1 > 2) { 10 } else { 20 }", "20"),
+        ]);
+    }
+
     fn test_vm(tests: Vec<(&str, &str)>) {
         for (input, expected) in tests {
             let lexer = Lexer::new(input);

@@ -39,7 +39,7 @@ macro_rules! byte_enum {
         byte_enum!(@step $idx + 1u8, $name, $byte, [$($tail,)*]);
     };
     ($name:ident, [$($var: ident),+]) => {
-        #[derive(Debug)]
+        #[derive(Debug, Clone, Copy, PartialEq)]
         #[repr(u8)]
         pub enum $name {
             $($var,)+
@@ -68,62 +68,16 @@ byte_enum!(
         NotEqual,
         GreaterThan,
         Minus,
-        Bang
+        Bang,
+        JumpIfNotTruthy,
+        Jump
     ]
 );
 
 impl OpCode {
-    pub fn constant(i: u16) -> Vec<u8> {
+    pub fn u16(i: u16) -> Vec<u8> {
         let bytes = i.to_be_bytes();
-        vec![OpCode::Constant as u8, bytes[0], bytes[1]]
-    }
-
-    pub fn pop() -> Vec<u8> {
-        vec![OpCode::Pop as u8]
-    }
-
-    pub fn add() -> Vec<u8> {
-        vec![OpCode::Add as u8]
-    }
-
-    pub fn sub() -> Vec<u8> {
-        vec![OpCode::Sub as u8]
-    }
-
-    pub fn mul() -> Vec<u8> {
-        vec![OpCode::Mul as u8]
-    }
-
-    pub fn div() -> Vec<u8> {
-        vec![OpCode::Div as u8]
-    }
-
-    pub fn push_true() -> Vec<u8> {
-        vec![OpCode::True as u8]
-    }
-
-    pub fn push_false() -> Vec<u8> {
-        vec![OpCode::False as u8]
-    }
-
-    pub fn equal() -> Vec<u8> {
-        vec![OpCode::Equal as u8]
-    }
-
-    pub fn not_equal() -> Vec<u8> {
-        vec![OpCode::NotEqual as u8]
-    }
-
-    pub fn greater_than() -> Vec<u8> {
-        vec![OpCode::GreaterThan as u8]
-    }
-
-    pub fn minus() -> Vec<u8> {
-        vec![OpCode::Minus as u8]
-    }
-
-    pub fn bang() -> Vec<u8> {
-        vec![OpCode::Bang as u8]
+        vec![bytes[0], bytes[1]]
     }
 }
 
@@ -169,6 +123,12 @@ pub fn read_operands(def: &Definition, insts: &Instructions, start: usize) -> (V
 
 pub fn read_uint16(insts: &Instructions, start: usize) -> u16 {
     u16::from_be_bytes([insts[start], insts[start + 1]])
+}
+
+pub fn replace_uint16(insts: &mut Instructions, start: usize, num: u16) {
+    let bytes = num.to_be_bytes();
+    insts[start] = bytes[0];
+    insts[start + 1] = bytes[1];
 }
 
 pub struct Definition {
@@ -229,6 +189,14 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
         OpCode::Bang => Definition {
             name: "OpBang".to_string(),
             widths: vec![],
+        },
+        OpCode::JumpIfNotTruthy => Definition {
+            name: "OpJumpIfNotTruthy".to_string(),
+            widths: vec![2],
+        },
+        OpCode::Jump => Definition {
+            name: "OpJump".to_string(),
+            widths: vec![2],
         },
     })
 }

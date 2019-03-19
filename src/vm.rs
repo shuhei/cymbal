@@ -90,14 +90,22 @@ impl Vm {
                 }
                 Some(OpCode::Bang) => {
                     let right = self.pop()?;
-                    match &*right {
-                        Object::Boolean(value) => {
-                            self.push(Rc::new(Object::Boolean(!value)))?;
-                        }
-                        _ => {
-                            self.push(Rc::new(Object::Boolean(false)))?;
-                        }
+                    self.push(Rc::new(Object::Boolean(!right.is_truthy())))?;
+                }
+                Some(OpCode::JumpIfNotTruthy) => {
+                    let pos = code::read_uint16(&self.instructions, ip + 1) as usize;
+                    ip += 2;
+
+                    let condition = self.pop()?;
+                    if !condition.is_truthy() {
+                        // `pos - 1` because `ip` will be incremented later.
+                        ip = pos - 1;
                     }
+                }
+                Some(OpCode::Jump) => {
+                    let pos = code::read_uint16(&self.instructions, ip + 1) as usize;
+                    // `pos - 1` because `ip` will be incremented later.
+                    ip = pos - 1;
                 }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));

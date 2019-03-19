@@ -14,9 +14,12 @@ mod compiler_tests {
     #[test]
     fn print_instructions() {
         let insts = vec![
-            OpCode::constant(1),
-            OpCode::constant(2),
-            OpCode::constant(65535),
+            vec![OpCode::Constant as u8],
+            OpCode::u16(1),
+            vec![OpCode::Constant as u8],
+            OpCode::u16(2),
+            vec![OpCode::Constant as u8],
+            OpCode::u16(65535),
         ];
         let expected = "0000 OpConstant 1
 0003 OpConstant 2
@@ -48,16 +51,8 @@ mod compiler_tests {
                 vec![Object::Integer(2), Object::Integer(1)],
                 "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpDiv\n0007 OpPop",
             ),
-            (
-                "true",
-                vec![],
-                "0000 OpTrue\n0001 OpPop",
-            ),
-            (
-                "false",
-                vec![],
-                "0000 OpFalse\n0001 OpPop",
-            ),
+            ("true", vec![], "0000 OpTrue\n0001 OpPop"),
+            ("false", vec![], "0000 OpFalse\n0001 OpPop"),
             (
                 "1 == 2",
                 vec![Object::Integer(1), Object::Integer(2)],
@@ -77,7 +72,7 @@ mod compiler_tests {
                 "1 < 2",
                 vec![Object::Integer(2), Object::Integer(1)],
                 "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpGreaterThan\n0007 OpPop",
-            )
+            ),
         ]);
     }
 
@@ -85,7 +80,43 @@ mod compiler_tests {
     fn prefix_expression() {
         test_compile(vec![
             ("!true", vec![], "0000 OpTrue\n0001 OpBang\n0002 OpPop"),
-            ("-123", vec![Object::Integer(123)], "0000 OpConstant 0\n0003 OpMinus\n0004 OpPop"),
+            (
+                "-123",
+                vec![Object::Integer(123)],
+                "0000 OpConstant 0\n0003 OpMinus\n0004 OpPop",
+            ),
+        ]);
+    }
+
+    #[test]
+    fn if_expression() {
+        test_compile(vec![
+            (
+                "if (true) { 10 }; 3333;",
+                vec![Object::Integer(10), Object::Integer(3333)],
+                "0000 OpTrue
+0001 OpJumpIfNotTruthy 7
+0004 OpConstant 0
+0007 OpPop
+0008 OpConstant 1
+0011 OpPop",
+            ),
+            (
+                "if (true) { 10 } else { 20 }; 3333;",
+                vec![
+                    Object::Integer(10),
+                    Object::Integer(20),
+                    Object::Integer(3333),
+                ],
+                "0000 OpTrue
+0001 OpJumpIfNotTruthy 10
+0004 OpConstant 0
+0007 OpJump 13
+0010 OpConstant 1
+0013 OpPop
+0014 OpConstant 2
+0017 OpPop",
+            ),
         ]);
     }
 
@@ -102,7 +133,9 @@ mod compiler_tests {
 
             assert_eq!(
                 code::print_instructions(&bytecode.instructions),
-                expected_instructions
+                expected_instructions,
+                "\nfor `{}`",
+                input
             );
             // TODO: Better way?
             let constants = bytecode
@@ -113,7 +146,7 @@ mod compiler_tests {
                     con.clone()
                 })
                 .collect::<Vec<Object>>();
-            assert_eq!(constants, expected_constants);
+            assert_eq!(constants, expected_constants, "\nfor {}", input);
         }
     }
 
