@@ -114,10 +114,12 @@ impl Compiler {
             //
             // should emit:
             //
-            // 1. condition (without the last pop)
-            // 2. jump to 4 if not truthy
+            // 1. condition
+            // 2. jump to 5 if not truthy
             // 3. consequence (without the last pop)
-            // 4. pop
+            // 4. jump to 6
+            // 5. push null
+            // 6. pop
             //
             // --
             //
@@ -141,21 +143,24 @@ impl Compiler {
                     self.remove_last_pop();
                 }
 
-                if let Some(alt) = alternative {
-                    let jump_pos =
-                        self.emit_with_operands(OpCode::Jump, OpCode::u16(TENTATIVE_JUMP_POS));
+                let jump_pos =
+                    self.emit_with_operands(OpCode::Jump, OpCode::u16(TENTATIVE_JUMP_POS));
 
-                    self.replace_operand(jump_not_truthy_pos, self.instructions.len() as u16);
+                self.replace_operand(jump_not_truthy_pos, self.instructions.len() as u16);
 
-                    self.compile_block_statement(alt)?;
-                    if self.last_instruction_is_pop() {
-                        self.remove_last_pop();
+                match alternative {
+                    Some(alt) => {
+                        self.compile_block_statement(alt)?;
+                        if self.last_instruction_is_pop() {
+                            self.remove_last_pop();
+                        }
                     }
-
-                    self.replace_operand(jump_pos, self.instructions.len() as u16);
-                } else {
-                    self.replace_operand(jump_not_truthy_pos, self.instructions.len() as u16);
+                    None => {
+                        self.emit(OpCode::Null);
+                    }
                 }
+
+                self.replace_operand(jump_pos, self.instructions.len() as u16);
             }
             _ => {}
         }

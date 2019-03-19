@@ -7,6 +7,7 @@ use std::fmt;
 use std::rc::Rc;
 
 pub const STACK_SIZE: usize = 2048;
+pub const NULL: Object = Object::Null;
 
 #[derive(Debug)]
 pub struct Vm {
@@ -106,6 +107,10 @@ impl Vm {
                     let pos = code::read_uint16(&self.instructions, ip + 1) as usize;
                     // `pos - 1` because `ip` will be incremented later.
                     ip = pos - 1;
+                }
+                Some(OpCode::Null) => {
+                    // TODO: This `Rc` is not neccessary because NULL is a constant...
+                    self.push(Rc::new(NULL))?;
                 }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));

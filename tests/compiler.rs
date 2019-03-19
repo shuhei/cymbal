@@ -95,11 +95,13 @@ mod compiler_tests {
                 "if (true) { 10 }; 3333;",
                 vec![Object::Integer(10), Object::Integer(3333)],
                 "0000 OpTrue
-0001 OpJumpIfNotTruthy 7
+0001 OpJumpIfNotTruthy 10
 0004 OpConstant 0
-0007 OpPop
-0008 OpConstant 1
-0011 OpPop",
+0007 OpJump 11
+0010 OpNull
+0011 OpPop
+0012 OpConstant 1
+0015 OpPop",
             ),
             (
                 "if (true) { 10 } else { 20 }; 3333;",

@@ -70,7 +70,8 @@ byte_enum!(
         Minus,
         Bang,
         JumpIfNotTruthy,
-        Jump
+        Jump,
+        Null
     ]
 );
 
@@ -197,6 +198,10 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
         OpCode::Jump => Definition {
             name: "OpJump".to_string(),
             widths: vec![2],
+        },
+        OpCode::Null => Definition {
+            name: "OpNull".to_string(),
+            widths: vec![],
         },
     })
 }
