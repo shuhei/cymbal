@@ -3,6 +3,7 @@ use crate::code;
 use crate::code::{Instructions, OpCode};
 use crate::compiler::Bytecode;
 use crate::object::Object;
+use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
@@ -12,13 +13,17 @@ pub const NULL: Object = Object::Null;
 
 #[derive(Debug)]
 pub struct Vm {
-    constants: Vec<Rc<Object>>,
+    constants: Rc<RefCell<Vec<Rc<Object>>>>,
     instructions: Instructions,
 
     stack: Vec<Rc<Object>>,
     sp: usize, // Stack pointer. Always points to the next value. Top of the stack is stack[sp - 1];
 
-    globals: Vec<Rc<Object>>,
+    globals: Rc<RefCell<Vec<Rc<Object>>>>,
+}
+
+pub fn new_globals() -> Vec<Rc<Object>> {
+    Vec::with_capacity(GLOBAL_SIZE)
 }
 
 impl Vm {
@@ -28,7 +33,20 @@ impl Vm {
             instructions: bytecode.instructions,
             stack: Vec::with_capacity(STACK_SIZE),
             sp: 0,
-            globals: Vec::with_capacity(GLOBAL_SIZE),
+            globals: Rc::new(RefCell::new(new_globals())),
+        }
+    }
+
+    pub fn new_with_globals_store(
+        bytecode: Bytecode,
+        globals: Rc<RefCell<Vec<Rc<Object>>>>,
+    ) -> Self {
+        Vm {
+            constants: bytecode.constants,
+            instructions: bytecode.instructions,
+            stack: Vec::with_capacity(STACK_SIZE),
+            sp: 0,
+            globals,
         }
     }
 
@@ -42,14 +60,12 @@ impl Vm {
                     let const_index = code::read_uint16(&self.instructions, ip + 1) as usize;
                     ip += 2;
 
-                    if const_index < self.constants.len() {
-                        let constant = Rc::clone(&self.constants[const_index]);
+                    let len = { self.constants.borrow().len() };
+                    if const_index < len {
+                        let constant = { Rc::clone(&self.constants.borrow()[const_index]) };
                         self.push(constant)?;
                     } else {
-                        return Err(VmError::InvalidConstIndex(
-                            const_index,
-                            self.constants.len(),
-                        ));
+                        return Err(VmError::InvalidConstIndex(const_index, len));
                     }
                 }
                 Some(OpCode::Pop) => {
@@ -120,17 +136,19 @@ impl Vm {
                     let global_index = code::read_uint16(&self.instructions, ip + 1) as usize;
                     ip += 2;
 
-                    self.push(Rc::clone(&self.globals[global_index]))?;
+                    let global = { Rc::clone(&self.globals.borrow()[global_index]) };
+                    self.push(global)?;
                 }
                 Some(OpCode::SetGlobal) => {
                     let global_index = code::read_uint16(&self.instructions, ip + 1) as usize;
                     ip += 2;
 
                     let popped = self.pop()?;
-                    if global_index == self.globals.len() {
-                        self.globals.push(popped);
+                    let mut globals = self.globals.borrow_mut();
+                    if global_index == globals.len() {
+                        globals.push(popped);
                     } else {
-                        self.globals[global_index] = popped;
+                        globals[global_index] = popped;
                     }
                 }
                 None => {

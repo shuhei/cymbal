@@ -3,8 +3,9 @@ pub mod symbol_table;
 use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::code;
 use crate::code::{Instructions, OpCode};
-use crate::compiler::symbol_table::SymbolTable;
+pub use crate::compiler::symbol_table::SymbolTable;
 use crate::object::Object;
+use std::cell::RefCell;
 use std::fmt;
 use std::mem;
 use std::rc::Rc;
@@ -13,8 +14,8 @@ const TENTATIVE_JUMP_POS: u16 = 9999;
 
 pub struct Compiler {
     pub instructions: Instructions,
-    pub constants: Vec<Rc<Object>>,
-    symbol_table: SymbolTable,
+    pub constants: Rc<RefCell<Vec<Rc<Object>>>>,
+    symbol_table: Rc<RefCell<SymbolTable>>,
     last_instruction: Option<EmittedInstruction>,
     previous_instruction: Option<EmittedInstruction>,
 }
@@ -23,8 +24,21 @@ impl Compiler {
     pub fn new() -> Self {
         Compiler {
             instructions: vec![],
-            constants: vec![],
-            symbol_table: SymbolTable::new(),
+            constants: Rc::new(RefCell::new(vec![])),
+            symbol_table: Rc::new(RefCell::new(SymbolTable::new())),
+            last_instruction: None,
+            previous_instruction: None,
+        }
+    }
+
+    pub fn new_with_state(
+        symbol_table: Rc<RefCell<SymbolTable>>,
+        constants: Rc<RefCell<Vec<Rc<Object>>>>,
+    ) -> Self {
+        Compiler {
+            instructions: vec![],
+            constants,
+            symbol_table,
             last_instruction: None,
             previous_instruction: None,
         }
@@ -45,7 +59,9 @@ impl Compiler {
             }
             Statement::Let(name, exp) => {
                 self.compile_expression(exp)?;
-                let symbol_index = self.symbol_table.define(name).index;
+                let symbol_index = {
+                    self.symbol_table.borrow_mut().define(name).index
+                };
                 self.emit_with_operands(OpCode::SetGlobal, OpCode::u16(symbol_index));
             }
             _ => {}
@@ -172,12 +188,15 @@ impl Compiler {
 
                 self.replace_operand(jump_pos, self.instructions.len() as u16);
             }
-            Expression::Identifier(name) => match self.symbol_table.resolve(name) {
-                Some(symbol) => {
-                    self.emit_with_operands(OpCode::GetGlobal, OpCode::u16(symbol.index));
-                }
-                None => return Err(CompileError::UndefinedVariable(name.to_string())),
-            },
+            Expression::Identifier(name) => {
+                let symbol_index = {
+                    match self.symbol_table.borrow().resolve(name) {
+                        Some(symbol) => symbol.index,
+                        None => return Err(CompileError::UndefinedVariable(name.to_string())),
+                    }
+                };
+                self.emit_with_operands(OpCode::GetGlobal, OpCode::u16(symbol_index));
+            }
             _ => {}
         }
         Ok(())
@@ -194,9 +213,10 @@ impl Compiler {
     }
 
     fn add_constant(&mut self, constant: Rc<Object>) -> u16 {
-        self.constants.push(constant);
+        let mut constants = self.constants.borrow_mut();
+        constants.push(constant);
         // TODO: Check the limit
-        (self.constants.len() - 1) as u16
+        (constants.len() - 1) as u16
     }
 
     fn emit(&mut self, op_code: OpCode) -> usize {
@@ -242,7 +262,7 @@ impl Compiler {
     pub fn bytecode(self) -> Bytecode {
         Bytecode {
             instructions: self.instructions,
-            constants: self.constants,
+            constants: Rc::clone(&self.constants),
         }
     }
 }
@@ -268,5 +288,5 @@ impl fmt::Display for CompileError {
 
 pub struct Bytecode {
     pub instructions: Instructions,
-    pub constants: Vec<Rc<Object>>,
+    pub constants: Rc<RefCell<Vec<Rc<Object>>>>,
 }

@@ -174,6 +174,8 @@ mod compiler_tests {
             // TODO: Better way?
             let constants = bytecode
                 .constants
+                .as_ref()
+                .borrow()
                 .iter()
                 .map(|c| {
                     let con: &Object = (*c).borrow();

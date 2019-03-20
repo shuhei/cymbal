@@ -1,8 +1,9 @@
+use crate::compiler::{Compiler, SymbolTable};
 use crate::evaluator;
 use crate::lexer::Lexer;
 use crate::object::Environment;
 use crate::parser::Parser;
-use crate::compiler::Compiler;
+use crate::vm;
 use crate::vm::Vm;
 use std::cell::RefCell;
 use std::io;
@@ -19,7 +20,13 @@ pub fn start(mode: Mode) {
     let stdin = io::stdin();
     let mut input = String::new();
 
+    // For evaluator
     let env = Rc::new(RefCell::new(Environment::new()));
+
+    // For compiler and vm
+    let constants = Rc::new(RefCell::new(Vec::new()));
+    let globals = Rc::new(RefCell::new(vm::new_globals()));
+    let symbol_table = Rc::new(RefCell::new(SymbolTable::new()));
 
     loop {
         print!(">> ");
@@ -43,18 +50,17 @@ pub fn start(mode: Mode) {
         }
 
         match mode {
-            Mode::Eval => {
-                match evaluator::eval(&program, Rc::clone(&env)) {
-                    Ok(obj) => {
-                        println!("{}", obj);
-                    }
-                    Err(err) => {
-                        println!("ERROR: {}", err);
-                    }
+            Mode::Eval => match evaluator::eval(&program, Rc::clone(&env)) {
+                Ok(obj) => {
+                    println!("{}", obj);
                 }
-            }
+                Err(err) => {
+                    println!("ERROR: {}", err);
+                }
+            },
             Mode::Compile => {
-                let mut compiler = Compiler::new();
+                let mut compiler =
+                    Compiler::new_with_state(Rc::clone(&symbol_table), Rc::clone(&constants));
                 match compiler.compile(&program) {
                     Err(err) => {
                         println!("Woops! Compilation failed: {}", err);
@@ -63,7 +69,7 @@ pub fn start(mode: Mode) {
                     _ => {}
                 }
                 let bytecode = compiler.bytecode();
-                let mut vm = Vm::new(bytecode);
+                let mut vm = Vm::new_with_globals_store(bytecode, Rc::clone(&globals));
                 match vm.run() {
                     Err(err) => {
                         println!("Woops! Executing bytecode failed: {}", err);
