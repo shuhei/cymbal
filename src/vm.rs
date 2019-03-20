@@ -7,6 +7,7 @@ use std::fmt;
 use std::rc::Rc;
 
 pub const STACK_SIZE: usize = 2048;
+pub const GLOBAL_SIZE: usize = 65536;
 pub const NULL: Object = Object::Null;
 
 #[derive(Debug)]
@@ -16,6 +17,8 @@ pub struct Vm {
 
     stack: Vec<Rc<Object>>,
     sp: usize, // Stack pointer. Always points to the next value. Top of the stack is stack[sp - 1];
+
+    globals: Vec<Rc<Object>>,
 }
 
 impl Vm {
@@ -25,6 +28,7 @@ impl Vm {
             instructions: bytecode.instructions,
             stack: Vec::with_capacity(STACK_SIZE),
             sp: 0,
+            globals: Vec::with_capacity(GLOBAL_SIZE),
         }
     }
 
@@ -111,6 +115,23 @@ impl Vm {
                 Some(OpCode::Null) => {
                     // TODO: This `Rc` is not neccessary because NULL is a constant...
                     self.push(Rc::new(NULL))?;
+                }
+                Some(OpCode::GetGlobal) => {
+                    let global_index = code::read_uint16(&self.instructions, ip + 1) as usize;
+                    ip += 2;
+
+                    self.push(Rc::clone(&self.globals[global_index]))?;
+                }
+                Some(OpCode::SetGlobal) => {
+                    let global_index = code::read_uint16(&self.instructions, ip + 1) as usize;
+                    ip += 2;
+
+                    let popped = self.pop()?;
+                    if global_index == self.globals.len() {
+                        self.globals.push(popped);
+                    } else {
+                        self.globals[global_index] = popped;
+                    }
                 }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));

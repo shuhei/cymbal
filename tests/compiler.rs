@@ -122,6 +122,38 @@ mod compiler_tests {
         ]);
     }
 
+    #[test]
+    fn global_let_statements() {
+        test_compile(vec![
+            (
+                "let one = 1; let two = 2;",
+                vec![Object::Integer(1), Object::Integer(2)],
+                "0000 OpConstant 0
+0003 OpSetGlobal 0
+0006 OpConstant 1
+0009 OpSetGlobal 1",
+            ),
+            (
+                "let one = 1; one;",
+                vec![Object::Integer(1)],
+                "0000 OpConstant 0
+0003 OpSetGlobal 0
+0006 OpGetGlobal 0
+0009 OpPop",
+            ),
+            (
+                "let one = 1; let two = one; two;",
+                vec![Object::Integer(1)],
+                "0000 OpConstant 0
+0003 OpSetGlobal 0
+0006 OpGetGlobal 0
+0009 OpSetGlobal 1
+0012 OpGetGlobal 1
+0015 OpPop",
+            ),
+        ]);
+    }
+
     fn test_compile(tests: Vec<(&str, Vec<Object>, &str)>) {
         for (input, expected_constants, expected_instructions) in tests {
             let program = parse(input);

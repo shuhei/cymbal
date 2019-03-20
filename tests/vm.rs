@@ -90,6 +90,15 @@ mod vm_tests {
         ]);
     }
 
+    #[test]
+    fn global_let_statements() {
+        test_vm(vec![
+            ("let one = 1; one", "1"),
+            ("let one = 1; let two = 2; one + two", "3"),
+            ("let one = 1; let two = one + one; one + two", "3"),
+        ]);
+    }
+
     fn test_vm(tests: Vec<(&str, &str)>) {
         for (input, expected) in tests {
             let lexer = Lexer::new(input);

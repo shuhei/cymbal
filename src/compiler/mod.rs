@@ -1,6 +1,9 @@
+pub mod symbol_table;
+
 use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::code;
 use crate::code::{Instructions, OpCode};
+use crate::compiler::symbol_table::SymbolTable;
 use crate::object::Object;
 use std::fmt;
 use std::mem;
@@ -11,6 +14,7 @@ const TENTATIVE_JUMP_POS: u16 = 9999;
 pub struct Compiler {
     pub instructions: Instructions,
     pub constants: Vec<Rc<Object>>,
+    symbol_table: SymbolTable,
     last_instruction: Option<EmittedInstruction>,
     previous_instruction: Option<EmittedInstruction>,
 }
@@ -20,6 +24,7 @@ impl Compiler {
         Compiler {
             instructions: vec![],
             constants: vec![],
+            symbol_table: SymbolTable::new(),
             last_instruction: None,
             previous_instruction: None,
         }
@@ -37,6 +42,11 @@ impl Compiler {
             Statement::Expression(exp) => {
                 self.compile_expression(exp)?;
                 self.emit(OpCode::Pop);
+            }
+            Statement::Let(name, exp) => {
+                self.compile_expression(exp)?;
+                let symbol_index = self.symbol_table.define(name).index;
+                self.emit_with_operands(OpCode::SetGlobal, OpCode::u16(symbol_index));
             }
             _ => {}
         }
@@ -162,6 +172,12 @@ impl Compiler {
 
                 self.replace_operand(jump_pos, self.instructions.len() as u16);
             }
+            Expression::Identifier(name) => match self.symbol_table.resolve(name) {
+                Some(symbol) => {
+                    self.emit_with_operands(OpCode::GetGlobal, OpCode::u16(symbol.index));
+                }
+                None => return Err(CompileError::UndefinedVariable(name.to_string())),
+            },
             _ => {}
         }
         Ok(())
@@ -238,12 +254,14 @@ pub struct EmittedInstruction {
 
 pub enum CompileError {
     UnknownOperator(Infix),
+    UndefinedVariable(String),
 }
 
 impl fmt::Display for CompileError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             CompileError::UnknownOperator(infix) => write!(f, "unknown operator: {}", infix),
+            CompileError::UndefinedVariable(name) => write!(f, "undefined variable: {}", name),
         }
     }
 }
