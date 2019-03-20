@@ -195,6 +195,12 @@ impl Compiler {
                 };
                 self.emit_with_operands(OpCode::GetGlobal, OpCode::u16(symbol_index));
             }
+            Expression::Array(exps) => {
+                for exp in exps {
+                    self.compile_expression(exp)?;
+                }
+                self.emit_with_operands(OpCode::Array, OpCode::u16(exps.len() as u16));
+            }
             _ => {}
         }
         Ok(())
@@ -461,6 +467,44 @@ mod tests {
 0003 OpConstant 1
 0006 OpAdd
 0007 OpPop",
+            ),
+        ]);
+    }
+
+    #[test]
+    fn array_expressions() {
+        test_compile(vec![
+            ("[]", vec![], "0000 OpArray 0\n0003 OpPop"),
+            (
+                "[1, 2, 3]",
+                vec![Object::Integer(1), Object::Integer(2), Object::Integer(3)],
+                "0000 OpConstant 0
+0003 OpConstant 1
+0006 OpConstant 2
+0009 OpArray 3
+0012 OpPop",
+            ),
+            (
+                "[1 - 2, 3 + 4, 5 * 6]",
+                vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::Integer(3),
+                    Object::Integer(4),
+                    Object::Integer(5),
+                    Object::Integer(6),
+                ],
+                "0000 OpConstant 0
+0003 OpConstant 1
+0006 OpSub
+0007 OpConstant 2
+0010 OpConstant 3
+0013 OpAdd
+0014 OpConstant 4
+0017 OpConstant 5
+0020 OpMul
+0021 OpArray 3
+0024 OpPop",
             ),
         ]);
     }

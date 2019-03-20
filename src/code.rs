@@ -73,7 +73,8 @@ byte_enum!(
         Jump,
         Null,
         GetGlobal,
-        SetGlobal
+        SetGlobal,
+        Array
     ]
 );
 
@@ -211,6 +212,10 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
         },
         OpCode::SetGlobal => Definition {
             name: "OpSetGlobal".to_string(),
+            widths: vec![2],
+        },
+        OpCode::Array => Definition {
+            name: "OpArray".to_string(),
             widths: vec![2],
         }
     })

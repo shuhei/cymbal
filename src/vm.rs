@@ -151,6 +151,19 @@ impl Vm {
                         globals[global_index] = popped;
                     }
                 }
+                Some(OpCode::Array) => {
+                    let size = code::read_uint16(&self.instructions, ip + 1) as usize;
+                    ip += 2;
+
+                    let mut items = Vec::with_capacity(size);
+                    for i in 0..size {
+                        // TODO: Don't clone an object from Rc!
+                        items.push((*self.stack[self.sp - size + i]).clone());
+                    }
+                    self.sp -= size;
+
+                    self.push(Rc::new(Object::Array(items)))?;
+                }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
                 }
@@ -423,9 +436,19 @@ mod tests {
 
     #[test]
     fn string_expressions() {
-        test_vm(vec![(r#""hello""#, r#""hello""#)]);
-        test_vm(vec![(r#""hello" + " world""#, r#""hello world""#)]);
-        test_vm(vec![(r#""foo" + "bar" + "baz""#, r#""foobarbaz""#)]);
+        test_vm(vec![
+            (r#""hello""#, r#""hello""#),
+            (r#""hello" + " world""#, r#""hello world""#),
+            (r#""foo" + "bar" + "baz""#, r#""foobarbaz""#),
+        ]);
+    }
+
+    #[test]
+    fn array_expressions() {
+        test_vm(vec![
+            ("[1, 2, 3]", "[1, 2, 3]"),
+            ("[1, 2 + 3, 4 + 5 + 6]", "[1, 5, 15]"),
+        ]);
     }
 
     fn test_vm(tests: Vec<(&str, &str)>) {
