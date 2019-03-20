@@ -200,36 +200,19 @@ impl Vm {
         left: &str,
         right: &str,
     ) -> Result<(), VmError> {
-        let result = match op_code {
-            OpCode::Add => format!("{}{}", left, right),
-            OpCode::Sub => {
-                return Err(VmError::UnsupportedInfix(
-                    Infix::Minus,
-                    Object::String(left.to_string()),
-                    Object::String(right.to_string()),
-                ));
+        match op_code {
+            OpCode::Add => {
+                let result = format!("{}{}", left, right);
+                self.push(Rc::new(Object::String(result)))
             }
-            OpCode::Mul => {
-                return Err(VmError::UnsupportedInfix(
-                    Infix::Asterisk,
-                    Object::String(left.to_string()),
-                    Object::String(right.to_string()),
-                ));
-            }
-            OpCode::Div => {
-                return Err(VmError::UnsupportedInfix(
-                    Infix::Slash,
-                    Object::String(left.to_string()),
-                    Object::String(right.to_string()),
-                ));
-            }
+            OpCode::Sub => unsupported_string_infix(Infix::Minus, left, right),
+            OpCode::Mul => unsupported_string_infix(Infix::Asterisk, left, right),
+            OpCode::Div => unsupported_string_infix(Infix::Slash, left, right),
             _ => {
                 // This happens only when this vm is wrong.
                 panic!("not integer binary operation: {:?}", op_code);
             }
-        };
-
-        self.push(Rc::new(Object::String(result)))
+        }
     }
 
     fn execute_comparison(&mut self, op_code: OpCode) -> Result<(), VmError> {
@@ -329,6 +312,14 @@ impl fmt::Display for VmError {
             }
         }
     }
+}
+
+fn unsupported_string_infix(infix: Infix, left: &str, right: &str) -> Result<(), VmError> {
+    return Err(VmError::UnsupportedInfix(
+        infix,
+        Object::String(left.to_string()),
+        Object::String(right.to_string()),
+    ));
 }
 
 #[cfg(test)]
