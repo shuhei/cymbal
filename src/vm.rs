@@ -167,6 +167,9 @@ impl Vm {
             (Object::Integer(l), Object::Integer(r)) => {
                 self.execute_integer_binary_operation(op_code, l, r)
             }
+            (Object::String(l), Object::String(r)) => {
+                self.execute_string_binary_operation(op_code, l, r)
+            }
             (l, r) => Err(VmError::TypeMismatch(l.clone(), r.clone())),
         }
     }
@@ -189,6 +192,44 @@ impl Vm {
         };
 
         self.push(Rc::new(Object::Integer(result)))
+    }
+
+    fn execute_string_binary_operation(
+        &mut self,
+        op_code: OpCode,
+        left: &str,
+        right: &str,
+    ) -> Result<(), VmError> {
+        let result = match op_code {
+            OpCode::Add => format!("{}{}", left, right),
+            OpCode::Sub => {
+                return Err(VmError::UnsupportedInfix(
+                    Infix::Minus,
+                    Object::String(left.to_string()),
+                    Object::String(right.to_string()),
+                ));
+            }
+            OpCode::Mul => {
+                return Err(VmError::UnsupportedInfix(
+                    Infix::Asterisk,
+                    Object::String(left.to_string()),
+                    Object::String(right.to_string()),
+                ));
+            }
+            OpCode::Div => {
+                return Err(VmError::UnsupportedInfix(
+                    Infix::Slash,
+                    Object::String(left.to_string()),
+                    Object::String(right.to_string()),
+                ));
+            }
+            _ => {
+                // This happens only when this vm is wrong.
+                panic!("not integer binary operation: {:?}", op_code);
+            }
+        };
+
+        self.push(Rc::new(Object::String(result)))
     }
 
     fn execute_comparison(&mut self, op_code: OpCode) -> Result<(), VmError> {
@@ -292,9 +333,9 @@ impl fmt::Display for VmError {
 
 #[cfg(test)]
 mod tests {
+    use crate::compiler::Compiler;
     use crate::lexer::Lexer;
     use crate::parser::Parser;
-    use crate::compiler::Compiler;
     use crate::vm::Vm;
 
     #[test]
@@ -389,6 +430,13 @@ mod tests {
         ]);
     }
 
+    #[test]
+    fn string_expressions() {
+        test_vm(vec![(r#""hello""#, r#""hello""#)]);
+        test_vm(vec![(r#""hello" + " world""#, r#""hello world""#)]);
+        test_vm(vec![(r#""foo" + "bar" + "baz""#, r#""foobarbaz""#)]);
+    }
+
     fn test_vm(tests: Vec<(&str, &str)>) {
         for (input, expected) in tests {
             let lexer = Lexer::new(input);
@@ -396,11 +444,7 @@ mod tests {
             let program = parser.parse_program();
             let errors = parser.errors();
             if errors.len() > 0 {
-                panic!(
-                    "for input '{}', got parser errors: {:?}",
-                    input,
-                    errors
-                );
+                panic!("for input '{}', got parser errors: {:?}", input, errors);
             }
 
             let mut compiler = Compiler::new();

@@ -443,6 +443,28 @@ mod tests {
         ]);
     }
 
+    #[test]
+    fn string_expressions() {
+        test_compile(vec![
+            (
+                r#""hello""#,
+                vec![Object::String("hello".to_string())],
+                "0000 OpConstant 0\n0003 OpPop",
+            ),
+            (
+                r#""hel" + "lo""#,
+                vec![
+                    Object::String("hel".to_string()),
+                    Object::String("lo".to_string()),
+                ],
+                "0000 OpConstant 0
+0003 OpConstant 1
+0006 OpAdd
+0007 OpPop",
+            ),
+        ]);
+    }
+
     fn test_compile(tests: Vec<(&str, Vec<Object>, &str)>) {
         for (input, expected_constants, expected_instructions) in tests {
             let program = parse(input);
