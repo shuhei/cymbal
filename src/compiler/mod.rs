@@ -6,6 +6,7 @@ use crate::code::{Instructions, OpCode};
 pub use crate::compiler::symbol_table::SymbolTable;
 use crate::object::Object;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt;
 use std::mem;
 use std::rc::Rc;
@@ -200,6 +201,28 @@ impl Compiler {
                     self.compile_expression(exp)?;
                 }
                 self.emit_with_operands(OpCode::Array, OpCode::u16(exps.len() as u16));
+            }
+            Expression::Hash(hash) => {
+                let size = hash.pairs.len();
+                // Have a stable order of hash pairs
+                let mut str_keys = Vec::with_capacity(size);
+                let mut map = HashMap::with_capacity(size);
+                for (key, value) in &hash.pairs {
+                    // Using `String` as key because it's hard to implement
+                    // `PartialOrd` for `Expression`.
+                    let str_key = key.to_string();
+                    // TODO: Is it possible to do this without cloning?
+                    str_keys.push(str_key.clone());
+                    map.insert(str_key, (key, value));
+                }
+                str_keys.sort();
+
+                for str_key in str_keys {
+                    let (key, value) = map.get(&str_key).unwrap();
+                    self.compile_expression(key)?;
+                    self.compile_expression(value)?;
+                }
+                self.emit_with_operands(OpCode::Hash, OpCode::u16(size as u16));
             }
             _ => {}
         }
@@ -505,6 +528,31 @@ mod tests {
 0020 OpMul
 0021 OpArray 3
 0024 OpPop",
+            ),
+        ]);
+    }
+
+    #[test]
+    fn hash_expression() {
+        test_compile(vec![
+            ("{}", vec![], "0000 OpHash 0\n0003 OpPop"),
+            (
+                r#"{ 1: "hello", "foo": 1 + 2 }"#,
+                vec![
+                    Object::String("foo".to_string()),
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::Integer(1),
+                    Object::String("hello".to_string()),
+                ],
+                "0000 OpConstant 0
+0003 OpConstant 1
+0006 OpConstant 2
+0009 OpAdd
+0010 OpConstant 3
+0013 OpConstant 4
+0016 OpHash 2
+0019 OpPop",
             ),
         ]);
     }

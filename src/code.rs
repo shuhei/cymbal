@@ -74,7 +74,8 @@ byte_enum!(
         Null,
         GetGlobal,
         SetGlobal,
-        Array
+        Array,
+        Hash
     ]
 );
 
@@ -217,6 +218,10 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
         OpCode::Array => Definition {
             name: "OpArray".to_string(),
             widths: vec![2],
-        }
+        },
+        OpCode::Hash => Definition {
+            name: "OpHash".to_string(),
+            widths: vec![2],
+        },
     })
 }

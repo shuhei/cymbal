@@ -1,5 +1,7 @@
 use crate::ast::{BlockStatement, Expression, HashLiteral, Infix, Prefix, Program, Statement};
-use crate::object::{Environment, EvalError, EvalResult, HashKey, Object};
+use crate::object::{
+    assert_argument_count, builtin, Environment, EvalError, EvalResult, HashKey, Object,
+};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -94,7 +96,7 @@ fn eval_hash_literal(
     for (k, v) in pairs {
         let key = eval_expression(k, env.clone())?;
         let value = eval_expression(v, env.clone())?;
-        let hash_key = HashKey::from_object(key)?;
+        let hash_key = HashKey::from_object(&key)?;
         map.insert(hash_key, value);
     }
     Ok(Object::Hash(map))
@@ -259,7 +261,7 @@ fn eval_identifier(name: &str, env: Rc<RefCell<Environment>>) -> EvalResult {
     if let Some(obj) = env.borrow().get(name) {
         return Ok(obj.clone());
     }
-    if let Some(obj) = lookup_builtin(name) {
+    if let Some(obj) = builtin::lookup(name) {
         return Ok(obj);
     }
     Err(EvalError::IdentifierNotFound(name.to_string()))
@@ -274,112 +276,6 @@ fn eval_expressions(
         results.push(eval_expression(exp, Rc::clone(&env))?);
     }
     Ok(results)
-}
-
-fn lookup_builtin(name: &str) -> Option<Object> {
-    match name {
-        // TODO: Should `null` be a reserved word? Otherwise it can be overridden like `undefined`
-        // of JavaScript non-strict mode.
-        "null" => Some(Object::Null),
-        "len" => Some(Object::Builtin(len)),
-        "first" => Some(Object::Builtin(first)),
-        "last" => Some(Object::Builtin(last)),
-        "rest" => Some(Object::Builtin(rest)),
-        "push" => Some(Object::Builtin(push)),
-        "puts" => Some(Object::Builtin(puts)),
-        _ => None,
-    }
-}
-
-fn len(arguments: Vec<Object>) -> EvalResult {
-    assert_argument_count(1, &arguments)?;
-    match &arguments[0] {
-        Object::String(value) => Ok(Object::Integer(value.len() as i64)),
-        Object::Array(values) => Ok(Object::Integer(values.len() as i64)),
-        _ => Err(EvalError::UnsupportedArguments(
-            "len".to_string(),
-            arguments,
-        )),
-    }
-}
-
-fn first(arguments: Vec<Object>) -> EvalResult {
-    assert_argument_count(1, &arguments)?;
-    match &arguments[0] {
-        Object::Array(values) => Ok(match values.first() {
-            Some(item) => item.clone(),
-            None => Object::Null,
-        }),
-        _ => Err(EvalError::UnsupportedArguments(
-            "first".to_string(),
-            arguments,
-        )),
-    }
-}
-
-fn last(arguments: Vec<Object>) -> EvalResult {
-    assert_argument_count(1, &arguments)?;
-    match &arguments[0] {
-        Object::Array(values) => Ok(match values.last() {
-            Some(item) => item.clone(),
-            None => Object::Null,
-        }),
-        _ => Err(EvalError::UnsupportedArguments(
-            "last".to_string(),
-            arguments,
-        )),
-    }
-}
-
-fn rest(arguments: Vec<Object>) -> EvalResult {
-    assert_argument_count(1, &arguments)?;
-    match &arguments[0] {
-        Object::Array(values) => {
-            if values.len() > 0 {
-                Ok(Object::Array(values[1..].to_vec()))
-            } else {
-                Ok(Object::Null)
-            }
-        }
-        _ => Err(EvalError::UnsupportedArguments(
-            "rest".to_string(),
-            arguments,
-        )),
-    }
-}
-
-fn push(arguments: Vec<Object>) -> EvalResult {
-    assert_argument_count(2, &arguments)?;
-    match &arguments[0] {
-        Object::Array(values) => {
-            // TODO: How can I just consume the first and second items of `arguments`?
-            let mut items = values.clone();
-            items.push(arguments[1].clone());
-            Ok(Object::Array(items))
-        }
-        _ => Err(EvalError::UnsupportedArguments(
-            "push".to_string(),
-            arguments,
-        )),
-    }
-}
-
-fn puts(arguments: Vec<Object>) -> EvalResult {
-    for arg in arguments {
-        // TODO: Remove `""` of Object::String
-        println!("{}", arg);
-    }
-    Ok(Object::Null)
-}
-
-fn assert_argument_count(expected: usize, arguments: &[Object]) -> Result<(), EvalError> {
-    if arguments.len() != expected {
-        return Err(EvalError::WrongArgumentCount {
-            expected,
-            given: arguments.len(),
-        });
-    }
-    Ok(())
 }
 
 #[cfg(test)]

@@ -2,8 +2,9 @@ use crate::ast::{Infix, Prefix};
 use crate::code;
 use crate::code::{Instructions, OpCode};
 use crate::compiler::Bytecode;
-use crate::object::Object;
+use crate::object::{EvalError, HashKey, Object};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
@@ -105,7 +106,10 @@ impl Vm {
                             self.push(Rc::new(Object::Integer(-value)))?;
                         }
                         obj => {
-                            return Err(VmError::UnsupportedPrefix(Prefix::Minus, obj.clone()));
+                            return Err(VmError::Eval(EvalError::UnknownPrefixOperator(
+                                Prefix::Minus,
+                                obj.clone(),
+                            )));
                         }
                     }
                 }
@@ -164,6 +168,23 @@ impl Vm {
 
                     self.push(Rc::new(Object::Array(items)))?;
                 }
+                Some(OpCode::Hash) => {
+                    let size = code::read_uint16(&self.instructions, ip + 1) as usize;
+                    ip += 2;
+
+                    let mut items = HashMap::with_capacity(size);
+                    for i in 0..size {
+                        let index = self.sp - size * 2 + i * 2;
+                        let key = HashKey::from_object(&self.stack[index])
+                            .or_else(|e| Err(VmError::Eval(e)))?;
+                        // TODO: Don't clone an object from Rc!
+                        let value = (*self.stack[index + 1]).clone();
+                        items.insert(key, value);
+                    }
+                    self.sp -= size * 2;
+
+                    self.push(Rc::new(Object::Hash(items)))?;
+                }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
                 }
@@ -183,7 +204,14 @@ impl Vm {
             (Object::String(l), Object::String(r)) => {
                 self.execute_string_binary_operation(op_code, l, r)
             }
-            (l, r) => Err(VmError::TypeMismatch(l.clone(), r.clone())),
+            (l, r) => {
+                let infix = infix_from_op_code(op_code).expect("not binary operation");
+                return Err(VmError::Eval(EvalError::TypeMismatch(
+                    infix,
+                    l.clone(),
+                    r.clone(),
+                )));
+            }
         }
     }
 
@@ -218,12 +246,16 @@ impl Vm {
                 let result = format!("{}{}", left, right);
                 self.push(Rc::new(Object::String(result)))
             }
-            OpCode::Sub => unsupported_string_infix(Infix::Minus, left, right),
-            OpCode::Mul => unsupported_string_infix(Infix::Asterisk, left, right),
-            OpCode::Div => unsupported_string_infix(Infix::Slash, left, right),
+            OpCode::Sub | OpCode::Mul | OpCode::Div => {
+                Err(VmError::Eval(EvalError::UnknownInfixOperator(
+                    infix_from_op_code(op_code).expect("not string binary operation"),
+                    Object::String(left.to_string()),
+                    Object::String(right.to_string()),
+                )))
+            }
             _ => {
                 // This happens only when this vm is wrong.
-                panic!("not integer binary operation: {:?}", op_code);
+                panic!("not string binary operation: {:?}", op_code);
             }
         }
     }
@@ -248,18 +280,25 @@ impl Vm {
                 match op_code {
                     OpCode::Equal => self.push(Rc::new(Object::Boolean(l == r))),
                     OpCode::NotEqual => self.push(Rc::new(Object::Boolean(l != r))),
-                    OpCode::GreaterThan => Err(VmError::UnsupportedInfix(
+                    OpCode::GreaterThan => Err(VmError::Eval(EvalError::UnknownInfixOperator(
                         Infix::Gt,
                         Object::Boolean(*l),
                         Object::Boolean(*r),
-                    )),
+                    ))),
                     _ => {
                         // This happens only when this vm is wrong.
                         panic!("unknown operator: {:?}", op_code);
                     }
                 }
             }
-            (l, r) => Err(VmError::TypeMismatch(l.clone(), r.clone())),
+            (l, r) => {
+                let infix = infix_from_op_code(op_code).expect("not comparison");
+                Err(VmError::Eval(EvalError::TypeMismatch(
+                    infix,
+                    l.clone(),
+                    r.clone(),
+                )))
+            }
         }
     }
 
@@ -288,14 +327,25 @@ impl Vm {
     }
 }
 
+fn infix_from_op_code(op_code: OpCode) -> Option<Infix> {
+    match op_code {
+        OpCode::Add => Some(Infix::Plus),
+        OpCode::Sub => Some(Infix::Minus),
+        OpCode::Mul => Some(Infix::Asterisk),
+        OpCode::Div => Some(Infix::Slash),
+        OpCode::Equal => Some(Infix::Eq),
+        OpCode::NotEqual => Some(Infix::NotEq),
+        OpCode::GreaterThan => Some(Infix::Gt),
+        _ => None,
+    }
+}
+
 pub enum VmError {
     UnknownOpCode(u8),
     InvalidConstIndex(usize, usize),
     StackOverflow,
     StackEmpty,
-    TypeMismatch(Object, Object),
-    UnsupportedInfix(Infix, Object, Object),
-    UnsupportedPrefix(Prefix, Object),
+    Eval(EvalError),
 }
 
 impl fmt::Display for VmError {
@@ -307,32 +357,9 @@ impl fmt::Display for VmError {
             }
             VmError::StackOverflow => write!(f, "stack overflow"),
             VmError::StackEmpty => write!(f, "stack empty"),
-            VmError::TypeMismatch(left, right) => write!(
-                f,
-                "type mismatch: {} {}",
-                left.type_name(),
-                right.type_name()
-            ),
-            VmError::UnsupportedInfix(infix, left, right) => write!(
-                f,
-                "unsupported infix: {} {} {}",
-                left.type_name(),
-                infix,
-                right.type_name()
-            ),
-            VmError::UnsupportedPrefix(prefix, right) => {
-                write!(f, "unsupported prefix: {} {}", prefix, right.type_name())
-            }
+            VmError::Eval(eval_error) => write!(f, "{}", eval_error),
         }
     }
-}
-
-fn unsupported_string_infix(infix: Infix, left: &str, right: &str) -> Result<(), VmError> {
-    return Err(VmError::UnsupportedInfix(
-        infix,
-        Object::String(left.to_string()),
-        Object::String(right.to_string()),
-    ));
 }
 
 #[cfg(test)]
@@ -444,10 +471,19 @@ mod tests {
     }
 
     #[test]
-    fn array_expressions() {
+    fn array_literals() {
         test_vm(vec![
             ("[1, 2, 3]", "[1, 2, 3]"),
             ("[1, 2 + 3, 4 + 5 + 6]", "[1, 5, 15]"),
+        ]);
+    }
+
+    #[test]
+    fn hash_literals() {
+        test_vm(vec![
+            ("{}", "{}"),
+            ("{1: 2, 2: 3}", "{1: 2, 2: 3}"),
+            ("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", "{2: 4, 6: 16}"),
         ]);
     }
 

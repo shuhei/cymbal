@@ -1,4 +1,8 @@
+pub mod builtin;
+pub mod environment;
+
 use crate::ast::{BlockStatement, Infix, Prefix};
+pub use crate::object::environment::Environment;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -98,12 +102,12 @@ impl fmt::Display for HashKey {
 }
 
 impl HashKey {
-    pub fn from_object(obj: Object) -> Result<HashKey, EvalError> {
+    pub fn from_object(obj: &Object) -> Result<HashKey, EvalError> {
         match obj {
-            Object::Integer(value) => Ok(HashKey::Integer(value)),
-            Object::String(value) => Ok(HashKey::String(value)),
-            Object::Boolean(value) => Ok(HashKey::Boolean(value)),
-            _ => Err(EvalError::UnsupportedHashKey(obj)),
+            Object::Integer(value) => Ok(HashKey::Integer(*value)),
+            Object::String(value) => Ok(HashKey::String(value.to_string())),
+            Object::Boolean(value) => Ok(HashKey::Boolean(*value)),
+            _ => Err(EvalError::UnsupportedHashKey(obj.clone())),
         }
     }
 }
@@ -170,38 +174,12 @@ impl fmt::Display for EvalError {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Environment {
-    store: HashMap<String, Object>,
-    outer: Option<Rc<RefCell<Environment>>>,
-}
-
-impl Environment {
-    pub fn new() -> Self {
-        Environment {
-            store: HashMap::new(),
-            outer: None,
-        }
+pub fn assert_argument_count(expected: usize, arguments: &[Object]) -> Result<(), EvalError> {
+    if arguments.len() != expected {
+        return Err(EvalError::WrongArgumentCount {
+            expected,
+            given: arguments.len(),
+        });
     }
-
-    pub fn extend(outer: Rc<RefCell<Self>>) -> Environment {
-        Environment {
-            store: HashMap::new(),
-            outer: Some(outer),
-        }
-    }
-
-    pub fn get(&self, name: &str) -> Option<Object> {
-        match self.store.get(name) {
-            Some(value) => Some(value.clone()),
-            None => self
-                .outer
-                .as_ref()
-                .and_then(|o| o.borrow().get(name).clone()),
-        }
-    }
-
-    pub fn set(&mut self, name: &str, val: Object) {
-        self.store.insert(name.to_string(), val);
-    }
+    Ok(())
 }
