@@ -224,6 +224,11 @@ impl Compiler {
                 }
                 self.emit_with_operands(OpCode::Hash, OpCode::u16(size as u16));
             }
+            Expression::Index(left, index) => {
+                self.compile_expression(left)?;
+                self.compile_expression(index)?;
+                self.emit(OpCode::Index);
+            }
             _ => {}
         }
         Ok(())
@@ -553,6 +558,46 @@ mod tests {
 0013 OpConstant 4
 0016 OpHash 2
 0019 OpPop",
+            ),
+        ]);
+    }
+
+    #[test]
+    fn index_expression() {
+        test_compile(vec![
+            (
+                "[1, 2][0]",
+                vec![Object::Integer(1), Object::Integer(2), Object::Integer(0)],
+                "0000 OpConstant 0
+0003 OpConstant 1
+0006 OpArray 2
+0009 OpConstant 2
+0012 OpIndex
+0013 OpPop",
+            ),
+            (
+                r#"{"foo": 1 + 2, "bar": 3 + 4}["bar"]"#,
+                vec![
+                    Object::String("bar".to_string()),
+                    Object::Integer(3),
+                    Object::Integer(4),
+                    Object::String("foo".to_string()),
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::String("bar".to_string()),
+                ],
+                "0000 OpConstant 0
+0003 OpConstant 1
+0006 OpConstant 2
+0009 OpAdd
+0010 OpConstant 3
+0013 OpConstant 4
+0016 OpConstant 5
+0019 OpAdd
+0020 OpHash 2
+0023 OpConstant 6
+0026 OpIndex
+0027 OpPop",
             ),
         ]);
     }

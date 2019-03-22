@@ -185,6 +185,47 @@ impl Vm {
 
                     self.push(Rc::new(Object::Hash(items)))?;
                 }
+                Some(OpCode::Index) => {
+                    let index = self.pop()?;
+                    let obj = self.pop()?;
+
+                    match &*obj {
+                        Object::Array(values) => {
+                            if let Object::Integer(i) = &*index {
+                                // TODO: Don't clone!
+                                let item = values.get(*i as usize).unwrap_or(&Object::Null).clone();
+                                self.push(Rc::new(item))?;
+                            } else {
+                                return Err(VmError::Eval(EvalError::UnknownIndexOperator(
+                                    (*obj).clone(),
+                                    (*index).clone(),
+                                )));
+                            }
+                        }
+                        Object::Hash(hash) => {
+                            let key = match &*index {
+                                Object::Integer(value) => HashKey::Integer(*value),
+                                // TODO Don't clone!
+                                Object::String(value) => HashKey::String(value.clone()),
+                                Object::Boolean(value) => HashKey::Boolean(*value),
+                                _ => {
+                                    return Err(VmError::Eval(EvalError::UnknownIndexOperator(
+                                        (*obj).clone(),
+                                        (*index).clone(),
+                                    )));
+                                }
+                            };
+                            let value = hash.get(&key).unwrap_or(&Object::Null);
+                            self.push(Rc::new(value.clone()))?;
+                        }
+                        _ => {
+                            return Err(VmError::Eval(EvalError::UnknownIndexOperator(
+                                (*obj).clone(),
+                                (*index).clone(),
+                            )));
+                        }
+                    }
+                }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
                 }
@@ -484,6 +525,16 @@ mod tests {
             ("{}", "{}"),
             ("{1: 2, 2: 3}", "{1: 2, 2: 3}"),
             ("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", "{2: 4, 6: 16}"),
+        ]);
+    }
+
+    #[test]
+    fn index_expression() {
+        test_vm(vec![
+            ("[][1]", "null"),
+            ("[1, 2][0]", "1"),
+            (r#"{}["foo"]"#, "null"),
+            (r#"{"foo": 1 + 2, "bar": 3 + 4}["bar"]"#, "7"),
         ]);
     }
 
