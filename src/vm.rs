@@ -532,6 +532,7 @@ mod tests {
     fn index_expression() {
         test_vm(vec![
             ("[][1]", "null"),
+            ("[1, 2][-1]", "null"),
             ("[1, 2][0]", "1"),
             (r#"{}["foo"]"#, "null"),
             (r#"{"foo": 1 + 2, "bar": 3 + 4}["bar"]"#, "7"),
