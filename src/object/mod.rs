@@ -2,6 +2,7 @@ pub mod builtin;
 pub mod environment;
 
 use crate::ast::{BlockStatement, Infix, Prefix};
+use crate::code;
 use crate::code::Instructions;
 pub use crate::object::environment::Environment;
 use std::cell::RefCell;
@@ -56,7 +57,7 @@ impl fmt::Display for Object {
                 write!(f, "fn({}) {{\n{}\n}}", params.join(", "), body)
             }
             Object::Builtin(_) => write!(f, "builtin function"),
-            Object::CompiledFunction(_) => write!(f, "compiled function"),
+            Object::CompiledFunction(ins) => write!(f, "compiled function: {}", code::print_instructions(ins)),
         }
     }
 }
