@@ -2,6 +2,7 @@ pub mod builtin;
 pub mod environment;
 
 use crate::ast::{BlockStatement, Infix, Prefix};
+use crate::code::Instructions;
 pub use crate::object::environment::Environment;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -22,6 +23,7 @@ pub enum Object {
     Return(Box<Object>),
     Function(Vec<String>, BlockStatement, Rc<RefCell<Environment>>),
     Builtin(BuiltinFunction),
+    CompiledFunction(Instructions),
 }
 
 impl fmt::Display for Object {
@@ -54,6 +56,7 @@ impl fmt::Display for Object {
                 write!(f, "fn({}) {{\n{}\n}}", params.join(", "), body)
             }
             Object::Builtin(_) => write!(f, "builtin function"),
+            Object::CompiledFunction(_) => write!(f, "compiled function"),
         }
     }
 }
@@ -70,6 +73,7 @@ impl Object {
             Object::Return(_) => "RETURN",
             Object::Function(_, _, _) => "FUNCTION",
             Object::Builtin(_) => "BUILTIN",
+            Object::CompiledFunction(_) => "COMPILED_FUNCTION"
         }
     }
 

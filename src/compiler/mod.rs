@@ -13,22 +13,90 @@ use std::rc::Rc;
 
 const TENTATIVE_JUMP_POS: u16 = 9999;
 
-pub struct Compiler {
+pub struct CompilationScope {
     pub instructions: Instructions,
-    pub constants: Rc<RefCell<Vec<Rc<Object>>>>,
-    symbol_table: Rc<RefCell<SymbolTable>>,
     last_instruction: Option<EmittedInstruction>,
     previous_instruction: Option<EmittedInstruction>,
 }
 
-impl Compiler {
+impl CompilationScope {
     pub fn new() -> Self {
-        Compiler {
+        CompilationScope {
             instructions: vec![],
-            constants: Rc::new(RefCell::new(vec![])),
-            symbol_table: Rc::new(RefCell::new(SymbolTable::new())),
             last_instruction: None,
             previous_instruction: None,
+        }
+    }
+
+    pub fn emit_with_operands(&mut self, op_code: OpCode, operands: Vec<u8>) -> usize {
+        let pos = self.instructions.len();
+        self.instructions.push(op_code as u8);
+        self.instructions.extend(operands);
+        self.set_last_instruction(op_code, pos);
+        pos
+    }
+
+    // Not updating last/previous_instruction because we still don't have cases
+    // that require it.
+    pub fn replace_instruction(&mut self, pos: usize, new_instruction: Instructions) {
+        for (i, byte) in new_instruction.iter().enumerate() {
+            let offset = pos + i;
+            if offset < self.instructions.len() {
+                self.instructions[offset] = *byte;
+            } else {
+                self.instructions.push(*byte);
+            }
+        }
+    }
+
+    fn set_last_instruction(&mut self, op_code: OpCode, position: usize) {
+        self.previous_instruction = mem::replace(
+            &mut self.last_instruction,
+            Some(EmittedInstruction { op_code, position }),
+        );
+    }
+
+    pub fn last_instruction_is(&self, op_code: OpCode) -> bool {
+        match &self.last_instruction {
+            Some(emitted) => emitted.op_code == op_code,
+            None => false,
+        }
+    }
+
+    pub fn remove_last_pop(&mut self) {
+        if let Some(emitted) = &self.last_instruction {
+            self.instructions.truncate(emitted.position);
+            self.last_instruction = mem::replace(&mut self.previous_instruction, None);
+        }
+    }
+
+    pub fn replace_last_pop_with_return(&mut self) {
+        if let Some(last) = &self.last_instruction {
+            let position = last.position;
+            self.replace_instruction(position, code::make(OpCode::ReturnValue));
+            self.last_instruction = Some(EmittedInstruction {
+                position: position,
+                op_code: OpCode::ReturnValue,
+            });
+        }
+    }
+}
+
+pub struct Compiler {
+    pub constants: Rc<RefCell<Vec<Rc<Object>>>>,
+    symbol_table: Rc<RefCell<SymbolTable>>,
+    scopes: Vec<CompilationScope>,
+    scope_index: usize,
+}
+
+impl Compiler {
+    pub fn new() -> Self {
+        let main_scope = CompilationScope::new();
+        Compiler {
+            constants: Rc::new(RefCell::new(vec![])),
+            symbol_table: Rc::new(RefCell::new(SymbolTable::new())),
+            scopes: vec![main_scope],
+            scope_index: 0,
         }
     }
 
@@ -36,12 +104,12 @@ impl Compiler {
         symbol_table: Rc<RefCell<SymbolTable>>,
         constants: Rc<RefCell<Vec<Rc<Object>>>>,
     ) -> Self {
+        let main_scope = CompilationScope::new();
         Compiler {
-            instructions: vec![],
             constants,
             symbol_table,
-            last_instruction: None,
-            previous_instruction: None,
+            scopes: vec![main_scope],
+            scope_index: 0,
         }
     }
 
@@ -63,7 +131,13 @@ impl Compiler {
                 let symbol_index = { self.symbol_table.borrow_mut().define(name).index };
                 self.emit_with_operands(OpCode::SetGlobal, OpCode::u16(symbol_index));
             }
-            _ => {}
+            Statement::Return(None) => {
+                self.emit(OpCode::Return);
+            }
+            Statement::Return(Some(value)) => {
+                self.compile_expression(value)?;
+                self.emit(OpCode::ReturnValue);
+            }
         }
         Ok(())
     }
@@ -164,19 +238,25 @@ impl Compiler {
                     .emit_with_operands(OpCode::JumpIfNotTruthy, OpCode::u16(TENTATIVE_JUMP_POS));
 
                 self.compile_block_statement(consequence)?;
-                if self.last_instruction_is_pop() {
+                if self.last_instruction_is(OpCode::Pop) {
                     self.remove_last_pop();
                 }
 
                 let jump_pos =
                     self.emit_with_operands(OpCode::Jump, OpCode::u16(TENTATIVE_JUMP_POS));
 
-                self.replace_operand(jump_not_truthy_pos, self.instructions.len() as u16);
+                self.replace_instruction(
+                    jump_not_truthy_pos,
+                    code::make_u16(
+                        OpCode::JumpIfNotTruthy,
+                        self.current_instructions().len() as u16,
+                    ),
+                );
 
                 match alternative {
                     Some(alt) => {
                         self.compile_block_statement(alt)?;
-                        if self.last_instruction_is_pop() {
+                        if self.last_instruction_is(OpCode::Pop) {
                             self.remove_last_pop();
                         }
                     }
@@ -185,7 +265,10 @@ impl Compiler {
                     }
                 }
 
-                self.replace_operand(jump_pos, self.instructions.len() as u16);
+                self.replace_instruction(
+                    jump_pos,
+                    code::make_u16(OpCode::Jump, self.current_instructions().len() as u16),
+                );
             }
             Expression::Identifier(name) => {
                 let symbol_index = {
@@ -229,6 +312,23 @@ impl Compiler {
                 self.compile_expression(index)?;
                 self.emit(OpCode::Index);
             }
+            Expression::FunctionLiteral(_args, body) => {
+                self.enter_scope();
+                self.compile_block_statement(body)?;
+                // Take care of implicit return like `fn() { 5 }`
+                if self.last_instruction_is(OpCode::Pop) {
+                    self.replace_last_pop_with_return();
+                }
+                // Take care of empty body like `fn() { }`
+                if !self.last_instruction_is(OpCode::ReturnValue) {
+                    self.emit(OpCode::Return);
+                }
+                let instructions = self.leave_scope();
+
+                let compiled_function = Rc::new(Object::CompiledFunction(instructions));
+                let const_index = self.add_constant(compiled_function);
+                self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
+            }
             _ => {}
         }
         Ok(())
@@ -244,6 +344,18 @@ impl Compiler {
         Ok(())
     }
 
+    fn enter_scope(&mut self) {
+        let scope = CompilationScope::new();
+        self.scopes.push(scope);
+        self.scope_index += 1;
+    }
+
+    fn leave_scope(&mut self) -> Instructions {
+        let scope = self.scopes.pop().expect("no scope to leave from");
+        self.scope_index -= 1;
+        return scope.instructions;
+    }
+
     fn add_constant(&mut self, constant: Rc<Object>) -> u16 {
         let mut constants = self.constants.borrow_mut();
         constants.push(constant);
@@ -257,43 +369,37 @@ impl Compiler {
     }
 
     fn emit_with_operands(&mut self, op_code: OpCode, operands: Vec<u8>) -> usize {
-        let pos = self.instructions.len();
-        self.instructions.push(op_code as u8);
-        self.instructions.extend(operands);
-        self.set_last_instruction(op_code, pos);
-        pos
+        self.scopes[self.scope_index].emit_with_operands(op_code, operands)
+    }
+
+    fn current_instructions(&self) -> &Instructions {
+        &self.scopes[self.scope_index].instructions
     }
 
     // Not updating last/previous_instruction because we still don't have cases
     // that require it.
-    fn replace_operand(&mut self, op_code_pos: usize, operand: u16) {
-        code::replace_uint16(&mut self.instructions, op_code_pos + 1, operand);
+    fn replace_instruction(&mut self, pos: usize, instruction: Instructions) {
+        self.scopes[self.scope_index].replace_instruction(pos, instruction)
     }
 
-    fn set_last_instruction(&mut self, op_code: OpCode, position: usize) {
-        self.previous_instruction = mem::replace(
-            &mut self.last_instruction,
-            Some(EmittedInstruction { op_code, position }),
-        );
-    }
-
-    fn last_instruction_is_pop(&self) -> bool {
-        match &self.last_instruction {
-            Some(emitted) => emitted.op_code == OpCode::Pop,
-            None => false,
-        }
+    fn last_instruction_is(&self, op_code: OpCode) -> bool {
+        self.scopes[self.scope_index].last_instruction_is(op_code)
     }
 
     fn remove_last_pop(&mut self) {
-        if let Some(emitted) = &self.last_instruction {
-            self.instructions.truncate(emitted.position);
-            self.last_instruction = mem::replace(&mut self.previous_instruction, None);
-        }
+        self.scopes[self.scope_index].remove_last_pop()
+    }
+
+    fn replace_last_pop_with_return(&mut self) {
+        self.scopes[self.scope_index].replace_last_pop_with_return()
     }
 
     pub fn bytecode(self) -> Bytecode {
+        let scope = &self.scopes[self.scope_index];
         Bytecode {
-            instructions: self.instructions,
+            // TODO: Can't this be done without cloning? Compiler's ownership moves to Bytecode
+            // anyway...
+            instructions: scope.instructions.clone(),
             constants: Rc::clone(&self.constants),
         }
     }
@@ -337,12 +443,9 @@ mod tests {
     #[test]
     fn print_instructions() {
         let insts = vec![
-            vec![OpCode::Constant as u8],
-            OpCode::u16(1),
-            vec![OpCode::Constant as u8],
-            OpCode::u16(2),
-            vec![OpCode::Constant as u8],
-            OpCode::u16(65535),
+            code::make_u16(OpCode::Constant, 1),
+            code::make_u16(OpCode::Constant, 2),
+            code::make_u16(OpCode::Constant, 65535),
         ];
         let expected = "0000 OpConstant 1
 0003 OpConstant 2
@@ -598,6 +701,68 @@ mod tests {
 0023 OpConstant 6
 0026 OpIndex
 0027 OpPop",
+            ),
+        ]);
+    }
+
+    #[test]
+    fn function_call() {
+        test_compile(vec![
+            (
+                "fn() { return 5 + 10 }",
+                vec![
+                    Object::Integer(5),
+                    Object::Integer(10),
+                    Object::CompiledFunction(
+                        vec![
+                            code::make_u16(OpCode::Constant, 0),
+                            code::make_u16(OpCode::Constant, 1),
+                            code::make(OpCode::Add),
+                            code::make(OpCode::ReturnValue),
+                        ]
+                        .concat(),
+                    ),
+                ],
+                "0000 OpConstant 2\n0003 OpPop",
+            ),
+            (
+                "fn() { 5 + 10 }",
+                vec![
+                    Object::Integer(5),
+                    Object::Integer(10),
+                    Object::CompiledFunction(
+                        vec![
+                            code::make_u16(OpCode::Constant, 0),
+                            code::make_u16(OpCode::Constant, 1),
+                            code::make(OpCode::Add),
+                            code::make(OpCode::ReturnValue),
+                        ]
+                        .concat(),
+                    ),
+                ],
+                "0000 OpConstant 2\n0003 OpPop",
+            ),
+            (
+                "fn() { 1; 2 }",
+                vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::CompiledFunction(
+                        vec![
+                            code::make_u16(OpCode::Constant, 0),
+                            code::make(OpCode::Pop),
+                            code::make_u16(OpCode::Constant, 1),
+                            code::make(OpCode::ReturnValue),
+                        ]
+                        .concat(),
+                    ),
+                ],
+                "0000 OpConstant 2\n0003 OpPop",
+            ),
+            (
+                "fn() { }",
+                vec![Object::CompiledFunction(code::make(OpCode::Return))],
+                "0000 OpConstant 0\n0003 OpPop",
             ),
         ]);
     }

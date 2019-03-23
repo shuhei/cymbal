@@ -76,7 +76,10 @@ byte_enum!(
         SetGlobal,
         Array,
         Hash,
-        Index
+        Index,
+        Call,
+        ReturnValue,
+        Return
     ]
 );
 
@@ -131,10 +134,13 @@ pub fn read_uint16(insts: &Instructions, start: usize) -> u16 {
     u16::from_be_bytes([insts[start], insts[start + 1]])
 }
 
-pub fn replace_uint16(insts: &mut Instructions, start: usize, num: u16) {
-    let bytes = num.to_be_bytes();
-    insts[start] = bytes[0];
-    insts[start + 1] = bytes[1];
+pub fn make(op_code: OpCode) -> Instructions {
+    vec![op_code as u8]
+}
+
+pub fn make_u16(op_code: OpCode, operand: u16) -> Instructions {
+    let bytes = u16::to_be_bytes(operand);
+    vec![op_code as u8, bytes[0], bytes[1]]
 }
 
 pub struct Definition {
@@ -226,6 +232,18 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
         },
         OpCode::Index => Definition {
             name: "OpIndex".to_string(),
+            widths: vec![],
+        },
+        OpCode::Call => Definition {
+            name: "OpCall".to_string(),
+            widths: vec![],
+        },
+        OpCode::ReturnValue => Definition {
+            name: "OpReturnValue".to_string(),
+            widths: vec![],
+        },
+        OpCode::Return => Definition {
+            name: "OpReturn".to_string(),
             widths: vec![],
         },
     })

@@ -226,6 +226,12 @@ impl Vm {
                         }
                     }
                 }
+                Some(OpCode::Call) => {
+                }
+                Some(OpCode::ReturnValue) => {
+                }
+                Some(OpCode::Return) => {
+                }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
                 }
