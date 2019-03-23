@@ -329,7 +329,10 @@ impl Compiler {
                 let const_index = self.add_constant(compiled_function);
                 self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
             }
-            _ => {}
+            Expression::Call(func, _args) => {
+                self.compile_expression(func)?;
+                self.emit(OpCode::Call);
+            }
         }
         Ok(())
     }
@@ -433,25 +436,25 @@ pub struct Bytecode {
 mod tests {
     use super::Compiler;
     use crate::ast::Program;
-    use crate::code;
-    use crate::code::OpCode;
+    use crate::code::{make, make_u16, print_instructions, OpCode};
     use crate::lexer::Lexer;
     use crate::object::Object;
     use crate::parser::Parser;
     use std::borrow::Borrow;
 
     #[test]
-    fn print_instructions() {
+    fn test_print_instructions() {
         let insts = vec![
-            code::make_u16(OpCode::Constant, 1),
-            code::make_u16(OpCode::Constant, 2),
-            code::make_u16(OpCode::Constant, 65535),
-        ];
+            make_u16(OpCode::Constant, 1),
+            make_u16(OpCode::Constant, 2),
+            make_u16(OpCode::Constant, 65535),
+        ]
+        .concat();
         let expected = "0000 OpConstant 1
 0003 OpConstant 2
 0006 OpConstant 65535";
 
-        assert_eq!(&code::print_instructions(&insts.concat()), expected);
+        assert_eq!(&print_instructions(&insts), expected);
     }
 
     #[test]
@@ -715,10 +718,10 @@ mod tests {
                     Object::Integer(10),
                     Object::CompiledFunction(
                         vec![
-                            code::make_u16(OpCode::Constant, 0),
-                            code::make_u16(OpCode::Constant, 1),
-                            code::make(OpCode::Add),
-                            code::make(OpCode::ReturnValue),
+                            make_u16(OpCode::Constant, 0),
+                            make_u16(OpCode::Constant, 1),
+                            make(OpCode::Add),
+                            make(OpCode::ReturnValue),
                         ]
                         .concat(),
                     ),
@@ -732,10 +735,10 @@ mod tests {
                     Object::Integer(10),
                     Object::CompiledFunction(
                         vec![
-                            code::make_u16(OpCode::Constant, 0),
-                            code::make_u16(OpCode::Constant, 1),
-                            code::make(OpCode::Add),
-                            code::make(OpCode::ReturnValue),
+                            make_u16(OpCode::Constant, 0),
+                            make_u16(OpCode::Constant, 1),
+                            make(OpCode::Add),
+                            make(OpCode::ReturnValue),
                         ]
                         .concat(),
                     ),
@@ -749,10 +752,10 @@ mod tests {
                     Object::Integer(2),
                     Object::CompiledFunction(
                         vec![
-                            code::make_u16(OpCode::Constant, 0),
-                            code::make(OpCode::Pop),
-                            code::make_u16(OpCode::Constant, 1),
-                            code::make(OpCode::ReturnValue),
+                            make_u16(OpCode::Constant, 0),
+                            make(OpCode::Pop),
+                            make_u16(OpCode::Constant, 1),
+                            make(OpCode::ReturnValue),
                         ]
                         .concat(),
                     ),
@@ -761,8 +764,34 @@ mod tests {
             ),
             (
                 "fn() { }",
-                vec![Object::CompiledFunction(code::make(OpCode::Return))],
+                vec![Object::CompiledFunction(make(OpCode::Return))],
                 "0000 OpConstant 0\n0003 OpPop",
+            ),
+        ]);
+    }
+
+    #[test]
+    fn function_calls() {
+        test_compile(vec![
+            (
+                "fn() { 24 }();",
+                vec![
+                    Object::Integer(24),
+                    Object::CompiledFunction(
+                        vec![make_u16(OpCode::Constant, 0), make(OpCode::ReturnValue)].concat(),
+                    ),
+                ],
+                "0000 OpConstant 1\n0003 OpCall\n0004 OpPop",
+            ),
+            (
+                "let noArg = fn() { 24 }; noArg();",
+                vec![
+                    Object::Integer(24),
+                    Object::CompiledFunction(
+                        vec![make_u16(OpCode::Constant, 0), make(OpCode::ReturnValue)].concat(),
+                    ),
+                ],
+                "0000 OpConstant 1\n0003 OpSetGlobal 0\n0006 OpGetGlobal 0\n0009 OpCall\n0010 OpPop",
             ),
         ]);
     }
@@ -779,7 +808,7 @@ mod tests {
             let bytecode = compiler.bytecode();
 
             assert_eq!(
-                code::print_instructions(&bytecode.instructions),
+                print_instructions(&bytecode.instructions),
                 expected_instructions,
                 "\nfor `{}`",
                 input
