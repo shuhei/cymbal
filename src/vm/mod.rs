@@ -635,6 +635,16 @@ mod tests {
         )]);
     }
 
+    #[test]
+    fn first_call_function() {
+        test_vm(vec![(
+            "let returnsOne = fn() { 1 };
+             let returnsOneReturner = fn() { returnsOne };
+             returnsOneReturner()();",
+            "1",
+        )]);
+    }
+
     fn test_vm(tests: Vec<(&str, &str)>) {
         for (input, expected) in tests {
             let lexer = Lexer::new(input);
