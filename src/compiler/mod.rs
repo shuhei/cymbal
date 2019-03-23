@@ -436,7 +436,7 @@ pub struct Bytecode {
 mod tests {
     use super::Compiler;
     use crate::ast::Program;
-    use crate::code::{make, make_u16, print_instructions, OpCode};
+    use crate::code::{make, make_u16, print_instructions, Instructions, OpCode};
     use crate::lexer::Lexer;
     use crate::object::Object;
     use crate::parser::Parser;
@@ -463,44 +463,88 @@ mod tests {
             (
                 "1 + 2",
                 vec![Object::Integer(1), Object::Integer(2)],
-                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpAdd\n0007 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::Add),
+                    make(OpCode::Pop),
+                ],
             ),
             (
                 "1 - 2",
                 vec![Object::Integer(1), Object::Integer(2)],
-                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpSub\n0007 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::Sub),
+                    make(OpCode::Pop),
+                ],
             ),
             (
                 "1 * 2",
                 vec![Object::Integer(1), Object::Integer(2)],
-                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpMul\n0007 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::Mul),
+                    make(OpCode::Pop),
+                ],
             ),
             (
                 "2 / 1",
                 vec![Object::Integer(2), Object::Integer(1)],
-                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpDiv\n0007 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::Div),
+                    make(OpCode::Pop),
+                ],
             ),
-            ("true", vec![], "0000 OpTrue\n0001 OpPop"),
-            ("false", vec![], "0000 OpFalse\n0001 OpPop"),
+            ("true", vec![], vec![make(OpCode::True), make(OpCode::Pop)]),
+            (
+                "false",
+                vec![],
+                vec![make(OpCode::False), make(OpCode::Pop)],
+            ),
             (
                 "1 == 2",
                 vec![Object::Integer(1), Object::Integer(2)],
-                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpEqual\n0007 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::Equal),
+                    make(OpCode::Pop),
+                ],
             ),
             (
                 "1 != 2",
                 vec![Object::Integer(1), Object::Integer(2)],
-                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpNotEqual\n0007 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::NotEqual),
+                    make(OpCode::Pop),
+                ],
             ),
             (
                 "1 > 2",
                 vec![Object::Integer(1), Object::Integer(2)],
-                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpGreaterThan\n0007 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::GreaterThan),
+                    make(OpCode::Pop),
+                ],
             ),
             (
                 "1 < 2",
                 vec![Object::Integer(2), Object::Integer(1)],
-                "0000 OpConstant 0\n0003 OpConstant 1\n0006 OpGreaterThan\n0007 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::GreaterThan),
+                    make(OpCode::Pop),
+                ],
             ),
         ]);
     }
@@ -508,11 +552,19 @@ mod tests {
     #[test]
     fn prefix_expression() {
         test_compile(vec![
-            ("!true", vec![], "0000 OpTrue\n0001 OpBang\n0002 OpPop"),
+            (
+                "!true",
+                vec![],
+                vec![make(OpCode::True), make(OpCode::Bang), make(OpCode::Pop)],
+            ),
             (
                 "-123",
                 vec![Object::Integer(123)],
-                "0000 OpConstant 0\n0003 OpMinus\n0004 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make(OpCode::Minus),
+                    make(OpCode::Pop),
+                ],
             ),
         ]);
     }
@@ -523,14 +575,16 @@ mod tests {
             (
                 "if (true) { 10 }; 3333;",
                 vec![Object::Integer(10), Object::Integer(3333)],
-                "0000 OpTrue
-0001 OpJumpIfNotTruthy 10
-0004 OpConstant 0
-0007 OpJump 11
-0010 OpNull
-0011 OpPop
-0012 OpConstant 1
-0015 OpPop",
+                vec![
+                    make(OpCode::True),
+                    make_u16(OpCode::JumpIfNotTruthy, 10),
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Jump, 11),
+                    make(OpCode::Null),
+                    make(OpCode::Pop),
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::Pop),
+                ],
             ),
             (
                 "if (true) { 10 } else { 20 }; 3333;",
@@ -539,14 +593,16 @@ mod tests {
                     Object::Integer(20),
                     Object::Integer(3333),
                 ],
-                "0000 OpTrue
-0001 OpJumpIfNotTruthy 10
-0004 OpConstant 0
-0007 OpJump 13
-0010 OpConstant 1
-0013 OpPop
-0014 OpConstant 2
-0017 OpPop",
+                vec![
+                    make(OpCode::True),
+                    make_u16(OpCode::JumpIfNotTruthy, 10),
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Jump, 13),
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::Pop),
+                    make_u16(OpCode::Constant, 2),
+                    make(OpCode::Pop),
+                ],
             ),
         ]);
     }
@@ -557,28 +613,34 @@ mod tests {
             (
                 "let one = 1; let two = 2;",
                 vec![Object::Integer(1), Object::Integer(2)],
-                "0000 OpConstant 0
-0003 OpSetGlobal 0
-0006 OpConstant 1
-0009 OpSetGlobal 1",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::SetGlobal, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make_u16(OpCode::SetGlobal, 1),
+                ],
             ),
             (
                 "let one = 1; one;",
                 vec![Object::Integer(1)],
-                "0000 OpConstant 0
-0003 OpSetGlobal 0
-0006 OpGetGlobal 0
-0009 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::SetGlobal, 0),
+                    make_u16(OpCode::GetGlobal, 0),
+                    make(OpCode::Pop),
+                ],
             ),
             (
                 "let one = 1; let two = one; two;",
                 vec![Object::Integer(1)],
-                "0000 OpConstant 0
-0003 OpSetGlobal 0
-0006 OpGetGlobal 0
-0009 OpSetGlobal 1
-0012 OpGetGlobal 1
-0015 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::SetGlobal, 0),
+                    make_u16(OpCode::GetGlobal, 0),
+                    make_u16(OpCode::SetGlobal, 1),
+                    make_u16(OpCode::GetGlobal, 1),
+                    make(OpCode::Pop),
+                ],
             ),
         ]);
     }
@@ -589,7 +651,7 @@ mod tests {
             (
                 r#""hello""#,
                 vec![Object::String("hello".to_string())],
-                "0000 OpConstant 0\n0003 OpPop",
+                vec![make_u16(OpCode::Constant, 0), make(OpCode::Pop)],
             ),
             (
                 r#""hel" + "lo""#,
@@ -597,10 +659,12 @@ mod tests {
                     Object::String("hel".to_string()),
                     Object::String("lo".to_string()),
                 ],
-                "0000 OpConstant 0
-0003 OpConstant 1
-0006 OpAdd
-0007 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::Add),
+                    make(OpCode::Pop),
+                ],
             ),
         ]);
     }
@@ -608,15 +672,21 @@ mod tests {
     #[test]
     fn array_expressions() {
         test_compile(vec![
-            ("[]", vec![], "0000 OpArray 0\n0003 OpPop"),
+            (
+                "[]",
+                vec![],
+                vec![make_u16(OpCode::Array, 0), make(OpCode::Pop)],
+            ),
             (
                 "[1, 2, 3]",
                 vec![Object::Integer(1), Object::Integer(2), Object::Integer(3)],
-                "0000 OpConstant 0
-0003 OpConstant 1
-0006 OpConstant 2
-0009 OpArray 3
-0012 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make_u16(OpCode::Constant, 2),
+                    make_u16(OpCode::Array, 3),
+                    make(OpCode::Pop),
+                ],
             ),
             (
                 "[1 - 2, 3 + 4, 5 * 6]",
@@ -628,17 +698,19 @@ mod tests {
                     Object::Integer(5),
                     Object::Integer(6),
                 ],
-                "0000 OpConstant 0
-0003 OpConstant 1
-0006 OpSub
-0007 OpConstant 2
-0010 OpConstant 3
-0013 OpAdd
-0014 OpConstant 4
-0017 OpConstant 5
-0020 OpMul
-0021 OpArray 3
-0024 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::Sub),
+                    make_u16(OpCode::Constant, 2),
+                    make_u16(OpCode::Constant, 3),
+                    make(OpCode::Add),
+                    make_u16(OpCode::Constant, 4),
+                    make_u16(OpCode::Constant, 5),
+                    make(OpCode::Mul),
+                    make_u16(OpCode::Array, 3),
+                    make(OpCode::Pop),
+                ],
             ),
         ]);
     }
@@ -646,7 +718,11 @@ mod tests {
     #[test]
     fn hash_expression() {
         test_compile(vec![
-            ("{}", vec![], "0000 OpHash 0\n0003 OpPop"),
+            (
+                "{}",
+                vec![],
+                vec![make_u16(OpCode::Hash, 0), make(OpCode::Pop)],
+            ),
             (
                 r#"{ 1: "hello", "foo": 1 + 2 }"#,
                 vec![
@@ -656,14 +732,16 @@ mod tests {
                     Object::Integer(1),
                     Object::String("hello".to_string()),
                 ],
-                "0000 OpConstant 0
-0003 OpConstant 1
-0006 OpConstant 2
-0009 OpAdd
-0010 OpConstant 3
-0013 OpConstant 4
-0016 OpHash 2
-0019 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make_u16(OpCode::Constant, 2),
+                    make(OpCode::Add),
+                    make_u16(OpCode::Constant, 3),
+                    make_u16(OpCode::Constant, 4),
+                    make_u16(OpCode::Hash, 2),
+                    make(OpCode::Pop),
+                ],
             ),
         ]);
     }
@@ -674,12 +752,14 @@ mod tests {
             (
                 "[1, 2][0]",
                 vec![Object::Integer(1), Object::Integer(2), Object::Integer(0)],
-                "0000 OpConstant 0
-0003 OpConstant 1
-0006 OpArray 2
-0009 OpConstant 2
-0012 OpIndex
-0013 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make_u16(OpCode::Array, 2),
+                    make_u16(OpCode::Constant, 2),
+                    make(OpCode::Index),
+                    make(OpCode::Pop),
+                ],
             ),
             (
                 r#"{"foo": 1 + 2, "bar": 3 + 4}["bar"]"#,
@@ -692,18 +772,20 @@ mod tests {
                     Object::Integer(2),
                     Object::String("bar".to_string()),
                 ],
-                "0000 OpConstant 0
-0003 OpConstant 1
-0006 OpConstant 2
-0009 OpAdd
-0010 OpConstant 3
-0013 OpConstant 4
-0016 OpConstant 5
-0019 OpAdd
-0020 OpHash 2
-0023 OpConstant 6
-0026 OpIndex
-0027 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make_u16(OpCode::Constant, 2),
+                    make(OpCode::Add),
+                    make_u16(OpCode::Constant, 3),
+                    make_u16(OpCode::Constant, 4),
+                    make_u16(OpCode::Constant, 5),
+                    make(OpCode::Add),
+                    make_u16(OpCode::Hash, 2),
+                    make_u16(OpCode::Constant, 6),
+                    make(OpCode::Index),
+                    make(OpCode::Pop),
+                ],
             ),
         ]);
     }
@@ -726,7 +808,7 @@ mod tests {
                         .concat(),
                     ),
                 ],
-                "0000 OpConstant 2\n0003 OpPop",
+                vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
             ),
             (
                 "fn() { 5 + 10 }",
@@ -743,7 +825,7 @@ mod tests {
                         .concat(),
                     ),
                 ],
-                "0000 OpConstant 2\n0003 OpPop",
+                vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
             ),
             (
                 "fn() { 1; 2 }",
@@ -760,12 +842,12 @@ mod tests {
                         .concat(),
                     ),
                 ],
-                "0000 OpConstant 2\n0003 OpPop",
+                vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
             ),
             (
                 "fn() { }",
                 vec![Object::CompiledFunction(make(OpCode::Return))],
-                "0000 OpConstant 0\n0003 OpPop",
+                vec![make_u16(OpCode::Constant, 0), make(OpCode::Pop)],
             ),
         ]);
     }
@@ -781,7 +863,11 @@ mod tests {
                         vec![make_u16(OpCode::Constant, 0), make(OpCode::ReturnValue)].concat(),
                     ),
                 ],
-                "0000 OpConstant 1\n0003 OpCall\n0004 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::Call),
+                    make(OpCode::Pop),
+                ],
             ),
             (
                 "let noArg = fn() { 24 }; noArg();",
@@ -791,12 +877,18 @@ mod tests {
                         vec![make_u16(OpCode::Constant, 0), make(OpCode::ReturnValue)].concat(),
                     ),
                 ],
-                "0000 OpConstant 1\n0003 OpSetGlobal 0\n0006 OpGetGlobal 0\n0009 OpCall\n0010 OpPop",
+                vec![
+                    make_u16(OpCode::Constant, 1),
+                    make_u16(OpCode::SetGlobal, 0),
+                    make_u16(OpCode::GetGlobal, 0),
+                    make(OpCode::Call),
+                    make(OpCode::Pop),
+                ],
             ),
         ]);
     }
 
-    fn test_compile(tests: Vec<(&str, Vec<Object>, &str)>) {
+    fn test_compile(tests: Vec<(&str, Vec<Object>, Vec<Instructions>)>) {
         for (input, expected_constants, expected_instructions) in tests {
             let program = parse(input);
 
@@ -809,7 +901,7 @@ mod tests {
 
             assert_eq!(
                 print_instructions(&bytecode.instructions),
-                expected_instructions,
+                print_instructions(&expected_instructions.concat()),
                 "\nfor `{}`",
                 input
             );
