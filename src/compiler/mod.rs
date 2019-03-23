@@ -4,7 +4,7 @@ use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::code;
 use crate::code::{Instructions, OpCode};
 pub use crate::compiler::symbol_table::SymbolTable;
-use crate::object::Object;
+use crate::object::{CompiledFunction, Object};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -12,75 +12,6 @@ use std::mem;
 use std::rc::Rc;
 
 const TENTATIVE_JUMP_POS: u16 = 9999;
-
-pub struct CompilationScope {
-    pub instructions: Instructions,
-    last_instruction: Option<EmittedInstruction>,
-    previous_instruction: Option<EmittedInstruction>,
-}
-
-impl CompilationScope {
-    pub fn new() -> Self {
-        CompilationScope {
-            instructions: vec![],
-            last_instruction: None,
-            previous_instruction: None,
-        }
-    }
-
-    pub fn emit_with_operands(&mut self, op_code: OpCode, operands: Vec<u8>) -> usize {
-        let pos = self.instructions.len();
-        self.instructions.push(op_code as u8);
-        self.instructions.extend(operands);
-        self.set_last_instruction(op_code, pos);
-        pos
-    }
-
-    // Not updating last/previous_instruction because we still don't have cases
-    // that require it.
-    pub fn replace_instruction(&mut self, pos: usize, new_instruction: Instructions) {
-        for (i, byte) in new_instruction.iter().enumerate() {
-            let offset = pos + i;
-            if offset < self.instructions.len() {
-                self.instructions[offset] = *byte;
-            } else {
-                self.instructions.push(*byte);
-            }
-        }
-    }
-
-    fn set_last_instruction(&mut self, op_code: OpCode, position: usize) {
-        self.previous_instruction = mem::replace(
-            &mut self.last_instruction,
-            Some(EmittedInstruction { op_code, position }),
-        );
-    }
-
-    pub fn last_instruction_is(&self, op_code: OpCode) -> bool {
-        match &self.last_instruction {
-            Some(emitted) => emitted.op_code == op_code,
-            None => false,
-        }
-    }
-
-    pub fn remove_last_pop(&mut self) {
-        if let Some(emitted) = &self.last_instruction {
-            self.instructions.truncate(emitted.position);
-            self.last_instruction = mem::replace(&mut self.previous_instruction, None);
-        }
-    }
-
-    pub fn replace_last_pop_with_return(&mut self) {
-        if let Some(last) = &self.last_instruction {
-            let position = last.position;
-            self.replace_instruction(position, code::make(OpCode::ReturnValue));
-            self.last_instruction = Some(EmittedInstruction {
-                position: position,
-                op_code: OpCode::ReturnValue,
-            });
-        }
-    }
-}
 
 pub struct Compiler {
     pub constants: Rc<RefCell<Vec<Rc<Object>>>>,
@@ -325,7 +256,8 @@ impl Compiler {
                 }
                 let instructions = self.leave_scope();
 
-                let compiled_function = Rc::new(Object::CompiledFunction(instructions));
+                let compiled_function =
+                    Rc::new(Object::CompiledFunction(CompiledFunction { instructions }));
                 let const_index = self.add_constant(compiled_function);
                 self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
             }
@@ -413,6 +345,75 @@ pub struct EmittedInstruction {
     pub position: usize,
 }
 
+pub struct CompilationScope {
+    pub instructions: Instructions,
+    last_instruction: Option<EmittedInstruction>,
+    previous_instruction: Option<EmittedInstruction>,
+}
+
+impl CompilationScope {
+    pub fn new() -> Self {
+        CompilationScope {
+            instructions: vec![],
+            last_instruction: None,
+            previous_instruction: None,
+        }
+    }
+
+    pub fn emit_with_operands(&mut self, op_code: OpCode, operands: Vec<u8>) -> usize {
+        let pos = self.instructions.len();
+        self.instructions.push(op_code as u8);
+        self.instructions.extend(operands);
+        self.set_last_instruction(op_code, pos);
+        pos
+    }
+
+    // Not updating last/previous_instruction because we still don't have cases
+    // that require it.
+    pub fn replace_instruction(&mut self, pos: usize, new_instruction: Instructions) {
+        for (i, byte) in new_instruction.iter().enumerate() {
+            let offset = pos + i;
+            if offset < self.instructions.len() {
+                self.instructions[offset] = *byte;
+            } else {
+                self.instructions.push(*byte);
+            }
+        }
+    }
+
+    fn set_last_instruction(&mut self, op_code: OpCode, position: usize) {
+        self.previous_instruction = mem::replace(
+            &mut self.last_instruction,
+            Some(EmittedInstruction { op_code, position }),
+        );
+    }
+
+    pub fn last_instruction_is(&self, op_code: OpCode) -> bool {
+        match &self.last_instruction {
+            Some(emitted) => emitted.op_code == op_code,
+            None => false,
+        }
+    }
+
+    pub fn remove_last_pop(&mut self) {
+        if let Some(emitted) = &self.last_instruction {
+            self.instructions.truncate(emitted.position);
+            self.last_instruction = mem::replace(&mut self.previous_instruction, None);
+        }
+    }
+
+    pub fn replace_last_pop_with_return(&mut self) {
+        if let Some(last) = &self.last_instruction {
+            let position = last.position;
+            self.replace_instruction(position, code::make(OpCode::ReturnValue));
+            self.last_instruction = Some(EmittedInstruction {
+                position: position,
+                op_code: OpCode::ReturnValue,
+            });
+        }
+    }
+}
+
 pub enum CompileError {
     UnknownOperator(Infix),
     UndefinedVariable(String),
@@ -438,7 +439,7 @@ mod tests {
     use crate::ast::Program;
     use crate::code::{make, make_u16, print_instructions, Instructions, OpCode};
     use crate::lexer::Lexer;
-    use crate::object::Object;
+    use crate::object::{CompiledFunction, Object};
     use crate::parser::Parser;
     use std::borrow::Borrow;
 
@@ -798,15 +799,12 @@ mod tests {
                 vec![
                     Object::Integer(5),
                     Object::Integer(10),
-                    Object::CompiledFunction(
-                        vec![
-                            make_u16(OpCode::Constant, 0),
-                            make_u16(OpCode::Constant, 1),
-                            make(OpCode::Add),
-                            make(OpCode::ReturnValue),
-                        ]
-                        .concat(),
-                    ),
+                    compiled_function(vec![
+                        make_u16(OpCode::Constant, 0),
+                        make_u16(OpCode::Constant, 1),
+                        make(OpCode::Add),
+                        make(OpCode::ReturnValue),
+                    ]),
                 ],
                 vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
             ),
@@ -815,15 +813,12 @@ mod tests {
                 vec![
                     Object::Integer(5),
                     Object::Integer(10),
-                    Object::CompiledFunction(
-                        vec![
-                            make_u16(OpCode::Constant, 0),
-                            make_u16(OpCode::Constant, 1),
-                            make(OpCode::Add),
-                            make(OpCode::ReturnValue),
-                        ]
-                        .concat(),
-                    ),
+                    compiled_function(vec![
+                        make_u16(OpCode::Constant, 0),
+                        make_u16(OpCode::Constant, 1),
+                        make(OpCode::Add),
+                        make(OpCode::ReturnValue),
+                    ]),
                 ],
                 vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
             ),
@@ -832,21 +827,18 @@ mod tests {
                 vec![
                     Object::Integer(1),
                     Object::Integer(2),
-                    Object::CompiledFunction(
-                        vec![
-                            make_u16(OpCode::Constant, 0),
-                            make(OpCode::Pop),
-                            make_u16(OpCode::Constant, 1),
-                            make(OpCode::ReturnValue),
-                        ]
-                        .concat(),
-                    ),
+                    compiled_function(vec![
+                        make_u16(OpCode::Constant, 0),
+                        make(OpCode::Pop),
+                        make_u16(OpCode::Constant, 1),
+                        make(OpCode::ReturnValue),
+                    ]),
                 ],
                 vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
             ),
             (
                 "fn() { }",
-                vec![Object::CompiledFunction(make(OpCode::Return))],
+                vec![compiled_function(vec![make(OpCode::Return)])],
                 vec![make_u16(OpCode::Constant, 0), make(OpCode::Pop)],
             ),
         ]);
@@ -859,9 +851,10 @@ mod tests {
                 "fn() { 24 }();",
                 vec![
                     Object::Integer(24),
-                    Object::CompiledFunction(
-                        vec![make_u16(OpCode::Constant, 0), make(OpCode::ReturnValue)].concat(),
-                    ),
+                    compiled_function(vec![
+                        make_u16(OpCode::Constant, 0),
+                        make(OpCode::ReturnValue),
+                    ]),
                 ],
                 vec![
                     make_u16(OpCode::Constant, 1),
@@ -873,9 +866,10 @@ mod tests {
                 "let noArg = fn() { 24 }; noArg();",
                 vec![
                     Object::Integer(24),
-                    Object::CompiledFunction(
-                        vec![make_u16(OpCode::Constant, 0), make(OpCode::ReturnValue)].concat(),
-                    ),
+                    compiled_function(vec![
+                        make_u16(OpCode::Constant, 0),
+                        make(OpCode::ReturnValue),
+                    ]),
                 ],
                 vec![
                     make_u16(OpCode::Constant, 1),
@@ -938,5 +932,11 @@ mod tests {
                 errors
             );
         }
+    }
+
+    fn compiled_function(nested_ins: Vec<Instructions>) -> Object {
+        Object::CompiledFunction(CompiledFunction {
+            instructions: nested_ins.concat(),
+        })
     }
 }

@@ -24,7 +24,7 @@ pub enum Object {
     Return(Box<Object>),
     Function(Vec<String>, BlockStatement, Rc<RefCell<Environment>>),
     Builtin(BuiltinFunction),
-    CompiledFunction(Instructions),
+    CompiledFunction(CompiledFunction),
 }
 
 impl fmt::Display for Object {
@@ -57,7 +57,11 @@ impl fmt::Display for Object {
                 write!(f, "fn({}) {{\n{}\n}}", params.join(", "), body)
             }
             Object::Builtin(_) => write!(f, "builtin function"),
-            Object::CompiledFunction(ins) => write!(f, "compiled function: {}", code::print_instructions(ins)),
+            Object::CompiledFunction(cf) => write!(
+                f,
+                "compiled function: {}",
+                code::print_instructions(&cf.instructions)
+            ),
         }
     }
 }
@@ -74,7 +78,7 @@ impl Object {
             Object::Return(_) => "RETURN",
             Object::Function(_, _, _) => "FUNCTION",
             Object::Builtin(_) => "BUILTIN",
-            Object::CompiledFunction(_) => "COMPILED_FUNCTION"
+            Object::CompiledFunction(_) => "COMPILED_FUNCTION",
         }
     }
 
@@ -115,6 +119,11 @@ impl HashKey {
             _ => Err(EvalError::UnsupportedHashKey(obj.clone())),
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CompiledFunction {
+    pub instructions: Instructions,
 }
 
 pub enum EvalError {

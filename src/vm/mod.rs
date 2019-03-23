@@ -1,8 +1,11 @@
+pub mod frame;
+
 use crate::ast::{Infix, Prefix};
 use crate::code;
 use crate::code::{Instructions, OpCode};
 use crate::compiler::Bytecode;
-use crate::object::{EvalError, HashKey, Object};
+use crate::object::{CompiledFunction, EvalError, HashKey, Object};
+pub use crate::vm::frame::Frame;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -10,31 +13,43 @@ use std::rc::Rc;
 
 pub const STACK_SIZE: usize = 2048;
 pub const GLOBAL_SIZE: usize = 65536;
+pub const MAX_FRAMES: usize = 1024;
 pub const NULL: Object = Object::Null;
 
 #[derive(Debug)]
 pub struct Vm {
     constants: Rc<RefCell<Vec<Rc<Object>>>>,
-    instructions: Instructions,
 
     stack: Vec<Rc<Object>>,
     sp: usize, // Stack pointer. Always points to the next value. Top of the stack is stack[sp - 1];
 
     globals: Rc<RefCell<Vec<Rc<Object>>>>,
+
+    frames: Vec<Frame>,
+    // TODO: Is this index necessary?
+    frames_index: usize,
 }
 
 pub fn new_globals() -> Vec<Rc<Object>> {
     Vec::with_capacity(GLOBAL_SIZE)
 }
 
+fn new_frames(instructions: Instructions) -> Vec<Frame> {
+    let main_frame = Frame::new(CompiledFunction { instructions });
+    let mut frames = Vec::with_capacity(MAX_FRAMES);
+    frames.push(main_frame);
+    frames
+}
+
 impl Vm {
     pub fn new(bytecode: Bytecode) -> Self {
         Vm {
             constants: bytecode.constants,
-            instructions: bytecode.instructions,
             stack: Vec::with_capacity(STACK_SIZE),
             sp: 0,
             globals: Rc::new(RefCell::new(new_globals())),
+            frames: new_frames(bytecode.instructions),
+            frames_index: 1,
         }
     }
 
@@ -44,22 +59,24 @@ impl Vm {
     ) -> Self {
         Vm {
             constants: bytecode.constants,
-            instructions: bytecode.instructions,
             stack: Vec::with_capacity(STACK_SIZE),
             sp: 0,
             globals,
+            frames: new_frames(bytecode.instructions),
+            frames_index: 1,
         }
     }
 
     pub fn run(&mut self) -> Result<(), VmError> {
-        let mut ip = 0;
-        while ip < self.instructions.len() {
-            // Fetch
-            let op_code_byte = self.instructions[ip];
+        while self.current_frame().ip < self.current_frame().instructions().len() {
+            let ip = self.current_frame().ip;
+            let ins = self.current_frame().instructions();
+            let op_code_byte = ins[ip];
+
             match OpCode::from_byte(op_code_byte) {
                 Some(OpCode::Constant) => {
-                    let const_index = code::read_uint16(&self.instructions, ip + 1) as usize;
-                    ip += 2;
+                    let const_index = code::read_uint16(ins, ip + 1) as usize;
+                    self.current_frame().ip += 2;
 
                     let len = { self.constants.borrow().len() };
                     if const_index < len {
@@ -118,34 +135,34 @@ impl Vm {
                     self.push(Rc::new(Object::Boolean(!right.is_truthy())))?;
                 }
                 Some(OpCode::JumpIfNotTruthy) => {
-                    let pos = code::read_uint16(&self.instructions, ip + 1) as usize;
-                    ip += 2;
+                    let pos = code::read_uint16(ins, ip + 1) as usize;
+                    self.current_frame().ip += 2;
 
                     let condition = self.pop()?;
                     if !condition.is_truthy() {
                         // `pos - 1` because `ip` will be incremented later.
-                        ip = pos - 1;
+                        self.current_frame().ip = pos - 1;
                     }
                 }
                 Some(OpCode::Jump) => {
-                    let pos = code::read_uint16(&self.instructions, ip + 1) as usize;
+                    let pos = code::read_uint16(ins, ip + 1) as usize;
                     // `pos - 1` because `ip` will be incremented later.
-                    ip = pos - 1;
+                    self.current_frame().ip = pos - 1;
                 }
                 Some(OpCode::Null) => {
                     // TODO: This `Rc` is not neccessary because NULL is a constant...
                     self.push(Rc::new(NULL))?;
                 }
                 Some(OpCode::GetGlobal) => {
-                    let global_index = code::read_uint16(&self.instructions, ip + 1) as usize;
-                    ip += 2;
+                    let global_index = code::read_uint16(ins, ip + 1) as usize;
+                    self.current_frame().ip += 2;
 
                     let global = { Rc::clone(&self.globals.borrow()[global_index]) };
                     self.push(global)?;
                 }
                 Some(OpCode::SetGlobal) => {
-                    let global_index = code::read_uint16(&self.instructions, ip + 1) as usize;
-                    ip += 2;
+                    let global_index = code::read_uint16(ins, ip + 1) as usize;
+                    self.current_frame().ip += 2;
 
                     let popped = self.pop()?;
                     let mut globals = self.globals.borrow_mut();
@@ -156,8 +173,8 @@ impl Vm {
                     }
                 }
                 Some(OpCode::Array) => {
-                    let size = code::read_uint16(&self.instructions, ip + 1) as usize;
-                    ip += 2;
+                    let size = code::read_uint16(ins, ip + 1) as usize;
+                    self.current_frame().ip += 2;
 
                     let mut items = Vec::with_capacity(size);
                     for i in 0..size {
@@ -169,8 +186,8 @@ impl Vm {
                     self.push(Rc::new(Object::Array(items)))?;
                 }
                 Some(OpCode::Hash) => {
-                    let size = code::read_uint16(&self.instructions, ip + 1) as usize;
-                    ip += 2;
+                    let size = code::read_uint16(ins, ip + 1) as usize;
+                    self.current_frame().ip += 2;
 
                     let mut items = HashMap::with_capacity(size);
                     for i in 0..size {
@@ -193,7 +210,7 @@ impl Vm {
                         Object::Array(values) => {
                             if let Object::Integer(i) = &*index {
                                 // TODO: Don't clone!
-                                let item = values.get(*i as usize).unwrap_or(&Object::Null).clone();
+                                let item = values.get(*i as usize).unwrap_or(&NULL).clone();
                                 self.push(Rc::new(item))?;
                             } else {
                                 return Err(VmError::Eval(EvalError::UnknownIndexOperator(
@@ -215,7 +232,7 @@ impl Vm {
                                     )));
                                 }
                             };
-                            let value = hash.get(&key).unwrap_or(&Object::Null);
+                            let value = hash.get(&key).unwrap_or(&NULL);
                             self.push(Rc::new(value.clone()))?;
                         }
                         _ => {
@@ -226,19 +243,44 @@ impl Vm {
                         }
                     }
                 }
-                Some(OpCode::Call) => {
-                }
+                // TODO: Don't clone...
+                Some(OpCode::Call) => match (*self.stack[self.sp - 1]).clone() {
+                    Object::CompiledFunction(func) => {
+                        self.push_frame(Frame::new(func));
+                        // `continue` to avoid incrementing `self.current_frame().ip` because we want
+                        // to start with the first instruction in the frame.
+                        continue;
+                    }
+                    obj => {
+                        return Err(VmError::Eval(EvalError::NotFunction(obj)));
+                    }
+                },
                 Some(OpCode::ReturnValue) => {
+                    let returned = self.pop()?;
+
+                    self.pop_frame();
+                    // Pop the just-executed compiled function.
+                    self.pop()?;
+
+                    self.push(returned)?;
                 }
                 Some(OpCode::Return) => {
+                    self.pop_frame();
+                    self.pop()?;
+
+                    self.push(Rc::new(NULL))?;
                 }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
                 }
             }
-            ip += 1;
+            self.current_frame().ip += 1;
         }
         Ok(())
+    }
+
+    pub fn last_popped_stack_elem(&self) -> Option<Rc<Object>> {
+        self.stack.get(self.sp).map(|o| Rc::clone(o))
     }
 
     fn execute_binary_operation(&mut self, op_code: OpCode) -> Result<(), VmError> {
@@ -369,8 +411,18 @@ impl Vm {
         popped.map(|o| Rc::clone(o)).ok_or(VmError::StackEmpty)
     }
 
-    pub fn last_popped_stack_elem(&self) -> Option<Rc<Object>> {
-        self.stack.get(self.sp).map(|o| Rc::clone(o))
+    fn current_frame(&mut self) -> &mut Frame {
+        &mut self.frames[self.frames_index - 1]
+    }
+
+    fn push_frame(&mut self, frame: Frame) {
+        self.frames.push(frame);
+        self.frames_index += 1;
+    }
+
+    fn pop_frame(&mut self) -> Frame {
+        self.frames_index -= 1;
+        self.frames.pop().expect("empty frames")
     }
 }
 
@@ -543,6 +595,44 @@ mod tests {
             (r#"{}["foo"]"#, "null"),
             (r#"{"foo": 1 + 2, "bar": 3 + 4}["bar"]"#, "7"),
         ]);
+    }
+
+    #[test]
+    fn function_call_without_arguments() {
+        test_vm(vec![
+            (
+                "let fivePlusTen = fn() { 5 + 10; };
+                 fivePlusTen();",
+                "15",
+            ),
+            (
+                "let one = fn() { 1 };
+                 let two = fn() { 2 };
+                 one() + two()",
+                "3",
+            ),
+            (
+                "let a = fn() { 1 };
+                 let b = fn() { a() + 2 };
+                 let c = fn() { b() + 3 };
+                 c();",
+                "6",
+            ),
+            (
+                "let earlyExit = fn() { return 99; 100 };
+                 earlyExit();",
+                "99",
+            ),
+        ]);
+    }
+
+    #[test]
+    fn function_call_without_return_value() {
+        test_vm(vec![(
+            "let noReturn = fn() {};
+             noReturn();",
+            "null",
+        )]);
     }
 
     fn test_vm(tests: Vec<(&str, &str)>) {
