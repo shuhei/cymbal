@@ -59,8 +59,18 @@ impl Compiler {
             }
             Statement::Let(name, exp) => {
                 self.compile_expression(exp)?;
-                let symbol_index = { self.symbol_table.borrow_mut().define(name).index };
-                self.emit_with_operands(OpCode::SetGlobal, OpCode::u16(symbol_index));
+
+                let (symbol_index, is_global) = {
+                    let mut table = self.symbol_table.borrow_mut();
+                    let symbol = table.define(name);
+                    (symbol.index, symbol.is_global())
+                };
+
+                if is_global {
+                    self.emit_with_operands(OpCode::SetGlobal, OpCode::u16(symbol_index));
+                } else {
+                    self.emit_with_operands(OpCode::SetLocal, vec![symbol_index as u8]);
+                }
             }
             Statement::Return(None) => {
                 self.emit(OpCode::Return);
@@ -202,13 +212,17 @@ impl Compiler {
                 );
             }
             Expression::Identifier(name) => {
-                let symbol_index = {
+                let (symbol_index, is_global) = {
                     match self.symbol_table.borrow().resolve(name) {
-                        Some(symbol) => symbol.index,
+                        Some(symbol) => (symbol.index, symbol.is_global()),
                         None => return Err(CompileError::UndefinedVariable(name.to_string())),
                     }
                 };
-                self.emit_with_operands(OpCode::GetGlobal, OpCode::u16(symbol_index));
+                if is_global {
+                    self.emit_with_operands(OpCode::GetGlobal, OpCode::u16(symbol_index));
+                } else {
+                    self.emit_with_operands(OpCode::GetLocal, vec![symbol_index as u8]);
+                }
             }
             Expression::Array(exps) => {
                 for exp in exps {
@@ -283,19 +297,23 @@ impl Compiler {
         let scope = CompilationScope::new();
         self.scopes.push(scope);
         self.scope_index += 1;
+
+        self.symbol_table.borrow_mut().push();
     }
 
     fn leave_scope(&mut self) -> Instructions {
         let scope = self.scopes.pop().expect("no scope to leave from");
         self.scope_index -= 1;
+
+        self.symbol_table.borrow_mut().pop();
+
         return scope.instructions;
     }
 
     fn add_constant(&mut self, constant: Rc<Object>) -> u16 {
-        let mut constants = self.constants.borrow_mut();
-        constants.push(constant);
+        self.constants.borrow_mut().push(constant);
         // TODO: Check the limit
-        (constants.len() - 1) as u16
+        (self.constants.borrow().len() - 1) as u16
     }
 
     fn emit(&mut self, op_code: OpCode) -> usize {
@@ -331,12 +349,13 @@ impl Compiler {
 
     pub fn bytecode(self) -> Bytecode {
         let scope = &self.scopes[self.scope_index];
-        Bytecode {
+        let bytecode = Bytecode {
             // TODO: Can't this be done without cloning? Compiler's ownership moves to Bytecode
             // anyway...
             instructions: scope.instructions.clone(),
-            constants: Rc::clone(&self.constants),
-        }
+            constants: self.constants,
+        };
+        bytecode
     }
 }
 
@@ -437,26 +456,11 @@ pub struct Bytecode {
 mod tests {
     use super::Compiler;
     use crate::ast::Program;
-    use crate::code::{make, make_u16, print_instructions, Instructions, OpCode};
+    use crate::code::{make, make_u16, make_u8, print_instructions, Instructions, OpCode};
     use crate::lexer::Lexer;
     use crate::object::{CompiledFunction, Object};
     use crate::parser::Parser;
     use std::borrow::Borrow;
-
-    #[test]
-    fn test_print_instructions() {
-        let insts = vec![
-            make_u16(OpCode::Constant, 1),
-            make_u16(OpCode::Constant, 2),
-            make_u16(OpCode::Constant, 65535),
-        ]
-        .concat();
-        let expected = "0000 OpConstant 1
-0003 OpConstant 2
-0006 OpConstant 65535";
-
-        assert_eq!(&print_instructions(&insts), expected);
-    }
 
     #[test]
     fn compile() {
@@ -878,6 +882,60 @@ mod tests {
                     make(OpCode::Call),
                     make(OpCode::Pop),
                 ],
+            ),
+        ]);
+    }
+
+    #[test]
+    fn let_statement_scopes() {
+        test_compile(vec![
+            (
+                "let num = 55; fn() { num }",
+                vec![
+                    Object::Integer(55),
+                    compiled_function(vec![
+                        make_u16(OpCode::GetGlobal, 0),
+                        make(OpCode::ReturnValue),
+                    ]),
+                ],
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::SetGlobal, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make(OpCode::Pop),
+                ],
+            ),
+            (
+                "let num = 55; num",
+                vec![Object::Integer(55)],
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::SetGlobal, 0),
+                    make_u16(OpCode::GetGlobal, 0),
+                    make(OpCode::Pop),
+                ],
+            ),
+            (
+                "fn() {
+                     let a = 55;
+                     let b = 77;
+                     a + b
+                 }",
+                vec![
+                    Object::Integer(55),
+                    Object::Integer(77),
+                    compiled_function(vec![
+                        make_u16(OpCode::Constant, 0),
+                        make_u8(OpCode::SetLocal, 0),
+                        make_u16(OpCode::Constant, 1),
+                        make_u8(OpCode::SetLocal, 1),
+                        make_u8(OpCode::GetLocal, 0),
+                        make_u8(OpCode::GetLocal, 1),
+                        make(OpCode::Add),
+                        make(OpCode::ReturnValue),
+                    ]),
+                ],
+                vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
             ),
         ]);
     }

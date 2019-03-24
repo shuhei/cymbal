@@ -18,12 +18,12 @@ pub const NULL: Object = Object::Null;
 
 #[derive(Debug)]
 pub struct Vm {
-    constants: Rc<RefCell<Vec<Rc<Object>>>>,
+    pub constants: Rc<RefCell<Vec<Rc<Object>>>>,
 
     stack: Vec<Rc<Object>>,
     sp: usize, // Stack pointer. Always points to the next value. Top of the stack is stack[sp - 1];
 
-    globals: Rc<RefCell<Vec<Rc<Object>>>>,
+    pub globals: Rc<RefCell<Vec<Rc<Object>>>>,
 
     frames: Vec<Frame>,
     // TODO: Is this index necessary?
@@ -78,7 +78,7 @@ impl Vm {
                     let const_index = code::read_uint16(ins, ip + 1) as usize;
                     self.current_frame().ip += 2;
 
-                    let len = { self.constants.borrow().len() };
+                    let len = self.constants.borrow().len();
                     if const_index < len {
                         let constant = { Rc::clone(&self.constants.borrow()[const_index]) };
                         self.push(constant)?;
@@ -157,7 +157,7 @@ impl Vm {
                     let global_index = code::read_uint16(ins, ip + 1) as usize;
                     self.current_frame().ip += 2;
 
-                    let global = { Rc::clone(&self.globals.borrow()[global_index]) };
+                    let global = Rc::clone(&self.globals.borrow()[global_index]);
                     self.push(global)?;
                 }
                 Some(OpCode::SetGlobal) => {
@@ -269,6 +269,9 @@ impl Vm {
                     self.pop()?;
 
                     self.push(Rc::new(NULL))?;
+                }
+                Some(_) => {
+                    return Err(VmError::UnknownOpCode(op_code_byte));
                 }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));

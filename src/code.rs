@@ -79,7 +79,9 @@ byte_enum!(
         Index,
         Call,
         ReturnValue,
-        Return
+        Return,
+        GetLocal,
+        SetLocal
     ]
 );
 
@@ -115,13 +117,16 @@ pub fn print_instructions(insts: &Instructions) -> String {
     result
 }
 
-pub fn read_operands(def: &Definition, insts: &Instructions, start: usize) -> (Vec<usize>, usize) {
+fn read_operands(def: &Definition, insts: &Instructions, start: usize) -> (Vec<usize>, usize) {
     let mut offset = 0;
     let mut operands = Vec::with_capacity(def.widths.len());
     for width in &def.widths {
         match width {
             2 => {
                 operands.push(read_uint16(insts, start + offset) as usize);
+            }
+            1 => {
+                operands.push(insts[start + offset] as usize);
             }
             _ => {}
         }
@@ -136,6 +141,10 @@ pub fn read_uint16(insts: &Instructions, start: usize) -> u16 {
 
 pub fn make(op_code: OpCode) -> Instructions {
     vec![op_code as u8]
+}
+
+pub fn make_u8(op_code: OpCode, operand: u8) -> Instructions {
+    vec![op_code as u8, operand]
 }
 
 pub fn make_u16(op_code: OpCode, operand: u16) -> Instructions {
@@ -246,5 +255,37 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
             name: "OpReturn".to_string(),
             widths: vec![],
         },
+        OpCode::GetLocal => Definition {
+            name: "OpGetLocal".to_string(),
+            widths: vec![1],
+        },
+        OpCode::SetLocal => Definition {
+            name: "OpSetLocal".to_string(),
+            widths: vec![1],
+        },
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::code::{make, make_u16, make_u8, print_instructions, OpCode};
+
+    #[test]
+    fn test_print_instructions() {
+        let insts = vec![
+            make_u16(OpCode::Constant, 1),
+            make_u16(OpCode::Constant, 2),
+            make_u16(OpCode::Constant, 65535),
+            make_u8(OpCode::GetLocal, 1),
+            make(OpCode::Pop),
+        ]
+        .concat();
+        let expected = "0000 OpConstant 1
+0003 OpConstant 2
+0006 OpConstant 65535
+0009 OpGetLocal 1
+0011 OpPop";
+
+        assert_eq!(&print_instructions(&insts), expected);
+    }
 }
