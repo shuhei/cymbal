@@ -78,6 +78,10 @@ impl SymbolTable {
             None
         })
     }
+
+    pub fn num_definitions(&self) -> usize {
+        self.store.len()
+    }
 }
 
 #[cfg(test)]

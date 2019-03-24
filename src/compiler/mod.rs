@@ -268,10 +268,14 @@ impl Compiler {
                 if !self.last_instruction_is(OpCode::ReturnValue) {
                     self.emit(OpCode::Return);
                 }
+
+                let num_locals = self.symbol_table.borrow().num_definitions();
                 let instructions = self.leave_scope();
 
-                let compiled_function =
-                    Rc::new(Object::CompiledFunction(CompiledFunction { instructions }));
+                let compiled_function = Rc::new(Object::CompiledFunction(CompiledFunction {
+                    instructions,
+                    num_locals: num_locals as u8,
+                }));
                 let const_index = self.add_constant(compiled_function);
                 self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
             }
@@ -803,12 +807,15 @@ mod tests {
                 vec![
                     Object::Integer(5),
                     Object::Integer(10),
-                    compiled_function(vec![
-                        make_u16(OpCode::Constant, 0),
-                        make_u16(OpCode::Constant, 1),
-                        make(OpCode::Add),
-                        make(OpCode::ReturnValue),
-                    ]),
+                    compiled_function(
+                        0,
+                        vec![
+                            make_u16(OpCode::Constant, 0),
+                            make_u16(OpCode::Constant, 1),
+                            make(OpCode::Add),
+                            make(OpCode::ReturnValue),
+                        ],
+                    ),
                 ],
                 vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
             ),
@@ -817,12 +824,15 @@ mod tests {
                 vec![
                     Object::Integer(5),
                     Object::Integer(10),
-                    compiled_function(vec![
-                        make_u16(OpCode::Constant, 0),
-                        make_u16(OpCode::Constant, 1),
-                        make(OpCode::Add),
-                        make(OpCode::ReturnValue),
-                    ]),
+                    compiled_function(
+                        0,
+                        vec![
+                            make_u16(OpCode::Constant, 0),
+                            make_u16(OpCode::Constant, 1),
+                            make(OpCode::Add),
+                            make(OpCode::ReturnValue),
+                        ],
+                    ),
                 ],
                 vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
             ),
@@ -831,18 +841,21 @@ mod tests {
                 vec![
                     Object::Integer(1),
                     Object::Integer(2),
-                    compiled_function(vec![
-                        make_u16(OpCode::Constant, 0),
-                        make(OpCode::Pop),
-                        make_u16(OpCode::Constant, 1),
-                        make(OpCode::ReturnValue),
-                    ]),
+                    compiled_function(
+                        0,
+                        vec![
+                            make_u16(OpCode::Constant, 0),
+                            make(OpCode::Pop),
+                            make_u16(OpCode::Constant, 1),
+                            make(OpCode::ReturnValue),
+                        ],
+                    ),
                 ],
                 vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
             ),
             (
                 "fn() { }",
-                vec![compiled_function(vec![make(OpCode::Return)])],
+                vec![compiled_function(0, vec![make(OpCode::Return)])],
                 vec![make_u16(OpCode::Constant, 0), make(OpCode::Pop)],
             ),
         ]);
@@ -855,10 +868,10 @@ mod tests {
                 "fn() { 24 }();",
                 vec![
                     Object::Integer(24),
-                    compiled_function(vec![
-                        make_u16(OpCode::Constant, 0),
-                        make(OpCode::ReturnValue),
-                    ]),
+                    compiled_function(
+                        0,
+                        vec![make_u16(OpCode::Constant, 0), make(OpCode::ReturnValue)],
+                    ),
                 ],
                 vec![
                     make_u16(OpCode::Constant, 1),
@@ -870,10 +883,10 @@ mod tests {
                 "let noArg = fn() { 24 }; noArg();",
                 vec![
                     Object::Integer(24),
-                    compiled_function(vec![
-                        make_u16(OpCode::Constant, 0),
-                        make(OpCode::ReturnValue),
-                    ]),
+                    compiled_function(
+                        0,
+                        vec![make_u16(OpCode::Constant, 0), make(OpCode::ReturnValue)],
+                    ),
                 ],
                 vec![
                     make_u16(OpCode::Constant, 1),
@@ -893,10 +906,10 @@ mod tests {
                 "let num = 55; fn() { num }",
                 vec![
                     Object::Integer(55),
-                    compiled_function(vec![
-                        make_u16(OpCode::GetGlobal, 0),
-                        make(OpCode::ReturnValue),
-                    ]),
+                    compiled_function(
+                        0,
+                        vec![make_u16(OpCode::GetGlobal, 0), make(OpCode::ReturnValue)],
+                    ),
                 ],
                 vec![
                     make_u16(OpCode::Constant, 0),
@@ -924,16 +937,19 @@ mod tests {
                 vec![
                     Object::Integer(55),
                     Object::Integer(77),
-                    compiled_function(vec![
-                        make_u16(OpCode::Constant, 0),
-                        make_u8(OpCode::SetLocal, 0),
-                        make_u16(OpCode::Constant, 1),
-                        make_u8(OpCode::SetLocal, 1),
-                        make_u8(OpCode::GetLocal, 0),
-                        make_u8(OpCode::GetLocal, 1),
-                        make(OpCode::Add),
-                        make(OpCode::ReturnValue),
-                    ]),
+                    compiled_function(
+                        2,
+                        vec![
+                            make_u16(OpCode::Constant, 0),
+                            make_u8(OpCode::SetLocal, 0),
+                            make_u16(OpCode::Constant, 1),
+                            make_u8(OpCode::SetLocal, 1),
+                            make_u8(OpCode::GetLocal, 0),
+                            make_u8(OpCode::GetLocal, 1),
+                            make(OpCode::Add),
+                            make(OpCode::ReturnValue),
+                        ],
+                    ),
                 ],
                 vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
             ),
@@ -992,9 +1008,10 @@ mod tests {
         }
     }
 
-    fn compiled_function(nested_ins: Vec<Instructions>) -> Object {
+    fn compiled_function(num_locals: u8, nested_ins: Vec<Instructions>) -> Object {
         Object::CompiledFunction(CompiledFunction {
             instructions: nested_ins.concat(),
+            num_locals,
         })
     }
 }

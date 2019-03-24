@@ -35,7 +35,13 @@ pub fn new_globals() -> Vec<Rc<Object>> {
 }
 
 fn new_frames(instructions: Instructions) -> Vec<Frame> {
-    let main_frame = Frame::new(CompiledFunction { instructions });
+    let main_frame = Frame::new(
+        CompiledFunction {
+            instructions,
+            num_locals: 0,
+        },
+        0,
+    );
     let mut frames = Vec::with_capacity(MAX_FRAMES);
     frames.push(main_frame);
     frames
@@ -43,23 +49,22 @@ fn new_frames(instructions: Instructions) -> Vec<Frame> {
 
 impl Vm {
     pub fn new(bytecode: Bytecode) -> Self {
-        Vm {
-            constants: bytecode.constants,
-            stack: Vec::with_capacity(STACK_SIZE),
-            sp: 0,
-            globals: Rc::new(RefCell::new(new_globals())),
-            frames: new_frames(bytecode.instructions),
-            frames_index: 1,
-        }
+        Vm::new_with_globals_store(bytecode, Rc::new(RefCell::new(new_globals())))
     }
 
     pub fn new_with_globals_store(
         bytecode: Bytecode,
         globals: Rc<RefCell<Vec<Rc<Object>>>>,
     ) -> Self {
+        let mut stack = Vec::with_capacity(STACK_SIZE);
+        // Pre-fill the stack so that we can easily put values with stack pointer.
+        for _ in 0..STACK_SIZE {
+            stack.push(Rc::new(NULL));
+        }
+
         Vm {
             constants: bytecode.constants,
-            stack: Vec::with_capacity(STACK_SIZE),
+            stack,
             sp: 0,
             globals,
             frames: new_frames(bytecode.instructions),
@@ -246,7 +251,13 @@ impl Vm {
                 // TODO: Don't clone...
                 Some(OpCode::Call) => match (*self.stack[self.sp - 1]).clone() {
                     Object::CompiledFunction(func) => {
-                        self.push_frame(Frame::new(func));
+                        let num_locals = func.num_locals;
+                        // Keep the stack pointer to come back after calling the function.
+                        self.push_frame(Frame::new(func, self.sp));
+
+                        // Reserve space for local bindings.
+                        self.sp += num_locals as usize;
+
                         // `continue` to avoid incrementing `self.current_frame().ip` because we want
                         // to start with the first instruction in the frame.
                         continue;
@@ -258,20 +269,35 @@ impl Vm {
                 Some(OpCode::ReturnValue) => {
                     let returned = self.pop()?;
 
-                    self.pop_frame();
-                    // Pop the just-executed compiled function.
-                    self.pop()?;
+                    let base_pointer = self.pop_frame().base_pointer;
+                    // Remove local bindings and the executed function.
+                    self.sp = base_pointer - 1;
 
                     self.push(returned)?;
                 }
                 Some(OpCode::Return) => {
-                    self.pop_frame();
-                    self.pop()?;
+                    let base_pointer = self.pop_frame().base_pointer;
+                    self.sp = base_pointer - 1;
 
                     self.push(Rc::new(NULL))?;
                 }
-                Some(_) => {
-                    return Err(VmError::UnknownOpCode(op_code_byte));
+                Some(OpCode::SetLocal) => {
+                    let local_index = ins[ip + 1] as usize;
+                    self.current_frame().ip += 1;
+
+                    let popped = self.pop()?;
+
+                    let base_pointer = self.current_frame().base_pointer;
+                    self.stack[base_pointer + local_index] = popped;
+                }
+                Some(OpCode::GetLocal) => {
+                    let local_index = ins[ip + 1] as usize;
+                    self.current_frame().ip += 1;
+
+                    let base_pointer = self.current_frame().base_pointer;
+
+                    let local = Rc::clone(&self.stack[base_pointer + local_index]);
+                    self.push(local)?;
                 }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
@@ -398,12 +424,7 @@ impl Vm {
         if self.sp >= STACK_SIZE {
             return Err(VmError::StackOverflow);
         }
-        if self.sp < self.stack.len() {
-            self.stack[self.sp] = obj;
-        } else {
-            // `Vec` doesn't allow index assignment if the index is not filled yet.
-            self.stack.push(obj);
-        }
+        self.stack[self.sp] = obj;
         self.sp += 1;
         Ok(())
     }
@@ -646,6 +667,37 @@ mod tests {
              returnsOneReturner()();",
             "1",
         )]);
+    }
+
+    #[test]
+    fn calling_functions_with_bindings() {
+        test_vm(vec![
+            ("let one = fn() { let one = 1; one }; one();", "1"),
+            (
+                "let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };
+                 oneAndTwo();",
+                "3",
+            ),
+            (
+                "let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };
+                 let threeAndFour = fn() { let three = 3; let four = 4; three + four; };
+                 oneAndTwo() + threeAndFour();",
+                "10",
+            ),
+            (
+                "let firstFoobar = fn() { let foobar = 50; foobar; };
+                 let secondFoobar = fn() { let foobar = 100; foobar; };
+                 firstFoobar() + secondFoobar();",
+                "150",
+            ),
+            (
+                "let globalSeed = 50;
+                 let minusOne = fn() { let num = 1; globalSeed - num; };
+                 let minusTwo = fn() { let num = 2; globalSeed - num; };
+                 minusOne() + minusTwo();",
+                "97",
+            ),
+        ]);
     }
 
     fn test_vm(tests: Vec<(&str, &str)>) {

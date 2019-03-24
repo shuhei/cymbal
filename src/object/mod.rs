@@ -59,7 +59,8 @@ impl fmt::Display for Object {
             Object::Builtin(_) => write!(f, "builtin function"),
             Object::CompiledFunction(cf) => write!(
                 f,
-                "compiled function: {}",
+                "compiled function ({}): {}",
+                cf.num_locals,
                 code::print_instructions(&cf.instructions)
             ),
         }
@@ -124,6 +125,7 @@ impl HashKey {
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompiledFunction {
     pub instructions: Instructions,
+    pub num_locals: u8,
 }
 
 pub enum EvalError {
