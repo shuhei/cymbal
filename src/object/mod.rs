@@ -126,6 +126,7 @@ impl HashKey {
 pub struct CompiledFunction {
     pub instructions: Instructions,
     pub num_locals: u8,
+    pub num_parameters: u8,
 }
 
 pub enum EvalError {

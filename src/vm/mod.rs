@@ -39,6 +39,7 @@ fn new_frames(instructions: Instructions) -> Vec<Frame> {
         CompiledFunction {
             instructions,
             num_locals: 0,
+            num_parameters: 0,
         },
         0,
     );
@@ -249,26 +250,15 @@ impl Vm {
                     }
                 }
                 // TODO: Don't clone...
-                Some(OpCode::Call) => match (*self.stack[self.sp - 1]).clone() {
-                    Object::CompiledFunction(func) => {
-                        let num_args = ins[ip + 1] as usize;
-                        self.increment_ip(1);
+                Some(OpCode::Call) => {
+                    let num_args = ins[ip + 1] as usize;
+                    self.increment_ip(1);
 
-                        let num_locals = func.num_locals as usize;
-                        // Keep the stack pointer to come back after calling the function.
-                        self.push_frame(Frame::new(func, self.sp));
-
-                        // Reserve space for local bindings. Arguments are kind of local bindings.
-                        self.sp += num_args + num_locals;
-
-                        // `continue` to avoid incrementing `self.current_frame().ip` because we want
-                        // to start with the first instruction in the frame.
-                        continue;
-                    }
-                    obj => {
-                        return Err(VmError::Eval(EvalError::NotFunction(obj)));
-                    }
-                },
+                    self.call_function(num_args)?;
+                    // `continue` to avoid incrementing `self.current_frame().ip` because we want
+                    // to start with the first instruction in the frame.
+                    continue;
+                }
                 Some(OpCode::ReturnValue) => {
                     let returned = self.pop()?;
 
@@ -423,6 +413,38 @@ impl Vm {
         }
     }
 
+    fn call_function(&mut self, num_args: usize) -> Result<(), VmError> {
+        // When there are two arguments:
+        //
+        // sp --> |          | <-- base_pointer + 2
+        //        |   arg 2  | <-- base_pointer + 1
+        //        |   arg 1  | <-- base_pointer
+        //        | function |
+        //        |   ....   |
+        //
+        match (*self.stack[self.sp - num_args - 1]).clone() {
+            Object::CompiledFunction(func) => {
+                if func.num_parameters as usize != num_args {
+                    return Err(VmError::Eval(EvalError::WrongArgumentCount {
+                        expected: func.num_parameters as usize,
+                        given: num_args,
+                    }));
+                }
+
+                let num_locals = func.num_locals as usize;
+                let base_pointer = self.sp - num_args;
+                // Keep the stack pointer to come back after calling the function.
+                self.push_frame(Frame::new(func, base_pointer));
+
+                // Reserve space for local bindings.
+                // `num_locals` includes `num_args` in itself.
+                self.sp = base_pointer + num_locals;
+                Ok(())
+            }
+            obj => Err(VmError::Eval(EvalError::NotFunction(obj))),
+        }
+    }
+
     fn push(&mut self, obj: Rc<Object>) -> Result<(), VmError> {
         if self.sp >= STACK_SIZE {
             return Err(VmError::StackOverflow);
@@ -505,7 +527,7 @@ mod tests {
 
     #[test]
     fn integer() {
-        test_vm(vec![
+        expect_values(vec![
             ("1", "1"),
             ("2", "2"),
             ("1 + 2", "3"),
@@ -531,7 +553,7 @@ mod tests {
 
     #[test]
     fn boolean() {
-        test_vm(vec![
+        expect_values(vec![
             ("true", "true"),
             ("false", "false"),
             ("true == true", "true"),
@@ -545,7 +567,7 @@ mod tests {
 
     #[test]
     fn prefix_minus() {
-        test_vm(vec![
+        expect_values(vec![
             ("-123", "-123"),
             ("-(1 + 3)", "-4"),
             ("-(10 - 23)", "13"),
@@ -554,7 +576,7 @@ mod tests {
 
     #[test]
     fn prefix_bang() {
-        test_vm(vec![
+        expect_values(vec![
             ("!true", "false"),
             ("!false", "true"),
             ("!0", "false"),
@@ -571,7 +593,7 @@ mod tests {
 
     #[test]
     fn if_expression() {
-        test_vm(vec![
+        expect_values(vec![
             ("if (true) { 10 }", "10"),
             ("if (true) { 10 } else { 20 }", "10"),
             ("if (false) { 10 } else { 20 }", "20"),
@@ -588,7 +610,7 @@ mod tests {
 
     #[test]
     fn global_let_statements() {
-        test_vm(vec![
+        expect_values(vec![
             ("let one = 1; one", "1"),
             ("let one = 1; let two = 2; one + two", "3"),
             ("let one = 1; let two = one + one; one + two", "3"),
@@ -597,7 +619,7 @@ mod tests {
 
     #[test]
     fn string_expressions() {
-        test_vm(vec![
+        expect_values(vec![
             (r#""hello""#, r#""hello""#),
             (r#""hello" + " world""#, r#""hello world""#),
             (r#""foo" + "bar" + "baz""#, r#""foobarbaz""#),
@@ -606,7 +628,7 @@ mod tests {
 
     #[test]
     fn array_literals() {
-        test_vm(vec![
+        expect_values(vec![
             ("[1, 2, 3]", "[1, 2, 3]"),
             ("[1, 2 + 3, 4 + 5 + 6]", "[1, 5, 15]"),
         ]);
@@ -614,7 +636,7 @@ mod tests {
 
     #[test]
     fn hash_literals() {
-        test_vm(vec![
+        expect_values(vec![
             ("{}", "{}"),
             ("{1: 2, 2: 3}", "{1: 2, 2: 3}"),
             ("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", "{2: 4, 6: 16}"),
@@ -623,7 +645,7 @@ mod tests {
 
     #[test]
     fn index_expression() {
-        test_vm(vec![
+        expect_values(vec![
             ("[][1]", "null"),
             ("[1, 2][-1]", "null"),
             ("[1, 2][0]", "1"),
@@ -634,7 +656,7 @@ mod tests {
 
     #[test]
     fn function_call_without_arguments() {
-        test_vm(vec![
+        expect_values(vec![
             (
                 "let fivePlusTen = fn() { 5 + 10; };
                  fivePlusTen();",
@@ -663,7 +685,7 @@ mod tests {
 
     #[test]
     fn function_call_without_return_value() {
-        test_vm(vec![(
+        expect_values(vec![(
             "let noReturn = fn() {};
              noReturn();",
             "null",
@@ -672,7 +694,7 @@ mod tests {
 
     #[test]
     fn first_call_function() {
-        test_vm(vec![(
+        expect_values(vec![(
             "let returnsOne = fn() { 1 };
              let returnsOneReturner = fn() { returnsOne };
              returnsOneReturner()();",
@@ -682,7 +704,7 @@ mod tests {
 
     #[test]
     fn calling_functions_with_bindings() {
-        test_vm(vec![
+        expect_values(vec![
             ("let one = fn() { let one = 1; one }; one();", "1"),
             (
                 "let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };
@@ -711,36 +733,101 @@ mod tests {
         ]);
     }
 
-    fn test_vm(tests: Vec<(&str, &str)>) {
-        for (input, expected) in tests {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
-            let program = parser.parse_program();
-            let errors = parser.errors();
-            if errors.len() > 0 {
-                panic!("for input '{}', got parser errors: {:?}", input, errors);
-            }
+    #[test]
+    fn calling_functions_with_arguments_and_bindings() {
+        expect_values(vec![
+            ("let identity = fn(x) { x; }; identity(4);", "4"),
+            ("let sum = fn(a, b) { a + b; }; sum(1, 2);", "3"),
+            ("let sum = fn(a, b) { let c = a + b; c; }; sum(1, 2);", "3"),
+            (
+                "let sum = fn(a, b) { let c = a + b; c; };
+                 sum(1, 2) + sum(3, 4);",
+                "10",
+            ),
+            (
+                "let sum = fn(a, b) { let c = a + b; c; };
+                 let outer = fn() { sum(1, 2) + sum(3, 4); };
+                 outer();",
+                "10",
+            ),
+            (
+                "let globalNum = 10;
+                 let sum = fn(a, b) {
+                    let c = a + b;
+                    c + globalNum;
+                 };
+                 let outer = fn() {
+                    sum(1, 2) + sum(3, 4) + globalNum;
+                 }
+                 outer() + globalNum;",
+                "50",
+            ),
+        ]);
+    }
 
-            let mut compiler = Compiler::new();
-            match compiler.compile(&program) {
-                Err(err) => {
-                    panic!("error on compile for `{}`: {}", input, err);
-                }
-                _ => {}
-            }
-            let bytecode = compiler.bytecode();
-            let mut vm = Vm::new(bytecode);
-            match vm.run() {
-                Err(err) => {
-                    panic!("error on vm for `{}`: {}", input, err);
-                }
-                _ => {}
+    #[test]
+    fn calling_functions_with_wrong_arguments() {
+        expect_errors(vec![
+            (
+                "fn() { 1; }(1);",
+                "wrong number of arguments: expected 0, given 1",
+            ),
+            (
+                "fn(a) { a; }();",
+                "wrong number of arguments: expected 1, given 0",
+            ),
+            (
+                "fn(a, b) { a + b; }(1);",
+                "wrong number of arguments: expected 2, given 1",
+            ),
+        ]);
+    }
+
+    fn expect_values(tests: Vec<(&str, &str)>) {
+        for (input, expected) in tests {
+            let mut vm = make_vm(input);
+            if let Err(err) = vm.run() {
+                panic!("error on vm for `{}`: {}", input, err);
             }
             if let Some(obj) = vm.last_popped_stack_elem() {
-                assert_eq!(&obj.to_string(), expected, "for `{}` {:?}", input, vm);
+                assert_eq!(&obj.to_string(), expected, "for `{}`", input);
             } else {
-                panic!("no stack top on vm for `{} {:?}`", input, vm);
+                panic!("no stack top on vm for `{}`", input);
             }
         }
+    }
+
+    fn expect_errors(tests: Vec<(&str, &str)>) {
+        for (input, expected) in tests {
+            let mut vm = make_vm(input);
+            match vm.run() {
+                Err(err) => {
+                    assert_eq!(&err.to_string(), expected, "for `{}`", input);
+                }
+                _ => {
+                    panic!("expected vm error: {} for `{}`", expected, input);
+                }
+            }
+        }
+    }
+
+    fn make_vm(input: &str) -> Vm {
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        let errors = parser.errors();
+        if errors.len() > 0 {
+            panic!("for input '{}', got parser errors: {:?}", input, errors);
+        }
+
+        let mut compiler = Compiler::new();
+        match compiler.compile(&program) {
+            Err(err) => {
+                panic!("error on compile for `{}`: {}", input, err);
+            }
+            _ => {}
+        }
+        let bytecode = compiler.bytecode();
+        Vm::new(bytecode)
     }
 }
