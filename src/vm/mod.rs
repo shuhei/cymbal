@@ -81,7 +81,7 @@ impl Vm {
             match OpCode::from_byte(op_code_byte) {
                 Some(OpCode::Constant) => {
                     let const_index = code::read_uint16(ins, ip + 1) as usize;
-                    self.current_frame().ip += 2;
+                    self.increment_ip(2);
 
                     let len = self.constants.borrow().len();
                     if const_index < len {
@@ -141,18 +141,18 @@ impl Vm {
                 }
                 Some(OpCode::JumpIfNotTruthy) => {
                     let pos = code::read_uint16(ins, ip + 1) as usize;
-                    self.current_frame().ip += 2;
+                    self.increment_ip(2);
 
                     let condition = self.pop()?;
                     if !condition.is_truthy() {
                         // `pos - 1` because `ip` will be incremented later.
-                        self.current_frame().ip = pos - 1;
+                        self.set_ip(pos - 1);
                     }
                 }
                 Some(OpCode::Jump) => {
                     let pos = code::read_uint16(ins, ip + 1) as usize;
                     // `pos - 1` because `ip` will be incremented later.
-                    self.current_frame().ip = pos - 1;
+                    self.set_ip(pos - 1);
                 }
                 Some(OpCode::Null) => {
                     // TODO: This `Rc` is not neccessary because NULL is a constant...
@@ -160,14 +160,14 @@ impl Vm {
                 }
                 Some(OpCode::GetGlobal) => {
                     let global_index = code::read_uint16(ins, ip + 1) as usize;
-                    self.current_frame().ip += 2;
+                    self.increment_ip(2);
 
                     let global = Rc::clone(&self.globals.borrow()[global_index]);
                     self.push(global)?;
                 }
                 Some(OpCode::SetGlobal) => {
                     let global_index = code::read_uint16(ins, ip + 1) as usize;
-                    self.current_frame().ip += 2;
+                    self.increment_ip(2);
 
                     let popped = self.pop()?;
                     let mut globals = self.globals.borrow_mut();
@@ -179,7 +179,7 @@ impl Vm {
                 }
                 Some(OpCode::Array) => {
                     let size = code::read_uint16(ins, ip + 1) as usize;
-                    self.current_frame().ip += 2;
+                    self.increment_ip(2);
 
                     let mut items = Vec::with_capacity(size);
                     for i in 0..size {
@@ -192,7 +192,7 @@ impl Vm {
                 }
                 Some(OpCode::Hash) => {
                     let size = code::read_uint16(ins, ip + 1) as usize;
-                    self.current_frame().ip += 2;
+                    self.increment_ip(2);
 
                     let mut items = HashMap::with_capacity(size);
                     for i in 0..size {
@@ -251,12 +251,15 @@ impl Vm {
                 // TODO: Don't clone...
                 Some(OpCode::Call) => match (*self.stack[self.sp - 1]).clone() {
                     Object::CompiledFunction(func) => {
-                        let num_locals = func.num_locals;
+                        let num_args = ins[ip + 1] as usize;
+                        self.increment_ip(1);
+
+                        let num_locals = func.num_locals as usize;
                         // Keep the stack pointer to come back after calling the function.
                         self.push_frame(Frame::new(func, self.sp));
 
-                        // Reserve space for local bindings.
-                        self.sp += num_locals as usize;
+                        // Reserve space for local bindings. Arguments are kind of local bindings.
+                        self.sp += num_args + num_locals;
 
                         // `continue` to avoid incrementing `self.current_frame().ip` because we want
                         // to start with the first instruction in the frame.
@@ -283,7 +286,7 @@ impl Vm {
                 }
                 Some(OpCode::SetLocal) => {
                     let local_index = ins[ip + 1] as usize;
-                    self.current_frame().ip += 1;
+                    self.increment_ip(1);
 
                     let popped = self.pop()?;
 
@@ -292,7 +295,7 @@ impl Vm {
                 }
                 Some(OpCode::GetLocal) => {
                     let local_index = ins[ip + 1] as usize;
-                    self.current_frame().ip += 1;
+                    self.increment_ip(1);
 
                     let base_pointer = self.current_frame().base_pointer;
 
@@ -303,7 +306,7 @@ impl Vm {
                     return Err(VmError::UnknownOpCode(op_code_byte));
                 }
             }
-            self.current_frame().ip += 1;
+            self.increment_ip(1);
         }
         Ok(())
     }
@@ -435,8 +438,16 @@ impl Vm {
         popped.map(|o| Rc::clone(o)).ok_or(VmError::StackEmpty)
     }
 
-    fn current_frame(&mut self) -> &mut Frame {
-        &mut self.frames[self.frames_index - 1]
+    fn current_frame(&self) -> &Frame {
+        &self.frames[self.frames_index - 1]
+    }
+
+    fn increment_ip(&mut self, diff: usize) {
+        self.frames[self.frames_index - 1].ip += diff;
+    }
+
+    fn set_ip(&mut self, to: usize) {
+        self.frames[self.frames_index - 1].ip = to;
     }
 
     fn push_frame(&mut self, frame: Frame) {

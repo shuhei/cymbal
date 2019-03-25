@@ -279,9 +279,12 @@ impl Compiler {
                 let const_index = self.add_constant(compiled_function);
                 self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
             }
-            Expression::Call(func, _args) => {
+            Expression::Call(func, args) => {
                 self.compile_expression(func)?;
-                self.emit(OpCode::Call);
+                for arg in args {
+                    self.compile_expression(arg)?;
+                }
+                self.emit_with_operands(OpCode::Call, vec![args.len() as u8]);
             }
         }
         Ok(())
@@ -800,7 +803,7 @@ mod tests {
     }
 
     #[test]
-    fn function_call() {
+    fn functions() {
         test_compile(vec![
             (
                 "fn() { return 5 + 10 }",
@@ -875,7 +878,7 @@ mod tests {
                 ],
                 vec![
                     make_u16(OpCode::Constant, 1),
-                    make(OpCode::Call),
+                    make_u8(OpCode::Call, 0),
                     make(OpCode::Pop),
                 ],
             ),
@@ -892,7 +895,41 @@ mod tests {
                     make_u16(OpCode::Constant, 1),
                     make_u16(OpCode::SetGlobal, 0),
                     make_u16(OpCode::GetGlobal, 0),
-                    make(OpCode::Call),
+                    make_u8(OpCode::Call, 0),
+                    make(OpCode::Pop),
+                ],
+            ),
+            (
+                "let oneArg = fn(a) { }; oneArg(24);",
+                vec![
+                    compiled_function(0, vec![make(OpCode::Return)]),
+                    Object::Integer(24),
+                ],
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::SetGlobal, 0),
+                    make_u16(OpCode::GetGlobal, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make_u8(OpCode::Call, 1),
+                    make(OpCode::Pop),
+                ],
+            ),
+            (
+                "let manyArg = fn(a, b, c) { }; manyArg(24, 25, 26);",
+                vec![
+                    compiled_function(0, vec![make(OpCode::Return)]),
+                    Object::Integer(24),
+                    Object::Integer(25),
+                    Object::Integer(26),
+                ],
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::SetGlobal, 0),
+                    make_u16(OpCode::GetGlobal, 0),
+                    make_u16(OpCode::Constant, 1),
+                    make_u16(OpCode::Constant, 2),
+                    make_u16(OpCode::Constant, 3),
+                    make_u8(OpCode::Call, 3),
                     make(OpCode::Pop),
                 ],
             ),

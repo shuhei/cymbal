@@ -245,7 +245,7 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
         },
         OpCode::Call => Definition {
             name: "OpCall".to_string(),
-            widths: vec![],
+            widths: vec![1],
         },
         OpCode::ReturnValue => Definition {
             name: "OpReturnValue".to_string(),
