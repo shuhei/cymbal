@@ -26,7 +26,7 @@ pub fn start(mode: Mode) {
     // For compiler and vm
     let constants = Rc::new(RefCell::new(Vec::new()));
     let globals = Rc::new(RefCell::new(vm::new_globals()));
-    let symbol_table = Rc::new(RefCell::new(SymbolTable::new()));
+    let symbol_table = Rc::new(RefCell::new(SymbolTable::new_with_builtins()));
 
     loop {
         print!(">> ");

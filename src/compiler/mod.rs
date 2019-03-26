@@ -4,7 +4,7 @@ use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::code;
 use crate::code::{Instructions, OpCode};
 pub use crate::compiler::symbol_table::{SymbolScope, SymbolTable};
-use crate::object::{builtin, CompiledFunction, Object};
+use crate::object::{CompiledFunction, Object};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -22,14 +22,11 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new() -> Self {
-        let mut symbol_table = SymbolTable::new();
-        for (i, b) in builtin::BUILTINS.iter().enumerate() {
-            symbol_table.define_builtin(i as u16, b.name);
-        }
+        let symbol_table = Rc::new(RefCell::new(SymbolTable::new_with_builtins()));
 
         let constants = Rc::new(RefCell::new(vec![]));
 
-        Compiler::new_with_state(Rc::new(RefCell::new(symbol_table)), constants)
+        Compiler::new_with_state(symbol_table, constants)
     }
 
     pub fn new_with_state(

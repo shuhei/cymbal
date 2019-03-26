@@ -1,3 +1,4 @@
+use crate::object::builtin;
 use std::collections::HashMap;
 use std::mem;
 
@@ -47,6 +48,14 @@ impl SymbolTable {
             current: SymbolLayer::new(),
             outers: vec![],
         }
+    }
+
+    pub fn new_with_builtins() -> Self {
+        let mut symbol_table = SymbolTable::new();
+        for (i, b) in builtin::BUILTINS.iter().enumerate() {
+            symbol_table.define_builtin(i as u16, b.name);
+        }
+        symbol_table
     }
 
     pub fn push(&mut self) {

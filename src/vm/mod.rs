@@ -4,7 +4,7 @@ use crate::ast::{Infix, Prefix};
 use crate::code;
 use crate::code::{Instructions, OpCode};
 use crate::compiler::Bytecode;
-use crate::object::{CompiledFunction, EvalError, HashKey, Object};
+use crate::object::{builtin, BuiltinFunction, CompiledFunction, EvalError, HashKey, Object};
 pub use crate::vm::frame::Frame;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -249,12 +249,11 @@ impl Vm {
                         }
                     }
                 }
-                // TODO: Don't clone...
                 Some(OpCode::Call) => {
                     let num_args = ins[ip + 1] as usize;
                     self.increment_ip(1);
 
-                    self.call_function(num_args)?;
+                    self.execute_call(num_args)?;
                     // `continue` to avoid incrementing `self.current_frame().ip` because we want
                     // to start with the first instruction in the frame.
                     continue;
@@ -293,7 +292,13 @@ impl Vm {
                     self.push(local)?;
                 }
                 Some(OpCode::GetBuiltin) => {
-                    unimplemented!();
+                    let builtin_index = ins[ip + 1] as usize;
+                    self.increment_ip(1);
+
+                    let builtin_function =
+                        Rc::new(builtin::BUILTINS[builtin_index].builtin.clone());
+
+                    self.push(builtin_function)?;
                 }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
@@ -416,36 +421,65 @@ impl Vm {
         }
     }
 
-    fn call_function(&mut self, num_args: usize) -> Result<(), VmError> {
-        // When there are two arguments:
-        //
-        // sp --> |          | <-- base_pointer + 2
-        //        |   arg 2  | <-- base_pointer + 1
-        //        |   arg 1  | <-- base_pointer
-        //        | function |
-        //        |   ....   |
-        //
+    fn execute_call(&mut self, num_args: usize) -> Result<(), VmError> {
+        // TODO: Don't clone...
         match (*self.stack[self.sp - num_args - 1]).clone() {
-            Object::CompiledFunction(func) => {
-                if func.num_parameters as usize != num_args {
-                    return Err(VmError::Eval(EvalError::WrongArgumentCount {
-                        expected: func.num_parameters as usize,
-                        given: num_args,
-                    }));
-                }
-
-                let num_locals = func.num_locals as usize;
-                let base_pointer = self.sp - num_args;
-                // Keep the stack pointer to come back after calling the function.
-                self.push_frame(Frame::new(func, base_pointer));
-
-                // Reserve space for local bindings.
-                // `num_locals` includes `num_args` in itself.
-                self.sp = base_pointer + num_locals;
-                Ok(())
-            }
-            obj => Err(VmError::Eval(EvalError::NotFunction(obj))),
+            Object::CompiledFunction(func) => self.call_function(num_args, func),
+            Object::Builtin(func) => self.call_builtin(num_args, func),
+            obj => return Err(VmError::Eval(EvalError::NotFunction(obj))),
         }
+    }
+
+    // When there are two arguments:
+    //
+    // sp --> |          | <-- base_pointer + 2
+    //        |   arg 2  | <-- base_pointer + 1
+    //        |   arg 1  | <-- base_pointer
+    //        | function |
+    //        |   ....   |
+    //
+    fn call_function(&mut self, num_args: usize, func: CompiledFunction) -> Result<(), VmError> {
+        if func.num_parameters as usize != num_args {
+            return Err(VmError::Eval(EvalError::WrongArgumentCount {
+                expected: func.num_parameters as usize,
+                given: num_args,
+            }));
+        }
+
+        let num_locals = func.num_locals as usize;
+        let base_pointer = self.sp - num_args;
+        // Keep the stack pointer to come back after calling the function.
+        self.push_frame(Frame::new(func, base_pointer));
+
+        // Reserve space for local bindings.
+        // `num_locals` includes `num_args` in itself.
+        self.sp = base_pointer + num_locals;
+        Ok(())
+    }
+
+    fn call_builtin(&mut self, num_args: usize, func: BuiltinFunction) -> Result<(), VmError> {
+        let mut args = Vec::with_capacity(num_args);
+        for _ in 0..num_args {
+            let arg = self.pop()?;
+            // TODO: Don't clone!
+            args.push((*arg).clone());
+        }
+        args.reverse();
+
+        let _function = self.pop()?;
+
+        match func(args) {
+            Ok(result) => {
+                self.push(Rc::new(result))?;
+            }
+            Err(error) => {
+                return Err(VmError::Eval(error));
+            }
+        }
+
+        self.increment_ip(1);
+
+        Ok(())
     }
 
     fn push(&mut self, obj: Rc<Object>) -> Result<(), VmError> {
@@ -782,6 +816,39 @@ mod tests {
             (
                 "fn(a, b) { a + b; }(1);",
                 "wrong number of arguments: expected 2, given 1",
+            ),
+        ]);
+    }
+
+    #[test]
+    fn calling_builtin_functions() {
+        expect_values(vec![
+            (r#"len("")"#, "0"),
+            (r#"len("four")"#, "4"),
+            (r#"len("hello world")"#, "11"),
+            ("len([]);", "0"),
+            ("len([1, 2, 3]);", "3"),
+            (r#"puts("hello", "world!")"#, "null"),
+            ("first([1, 2, 3])", "1"),
+            ("first([])", "null"),
+            ("last([1, 2, 3])", "3"),
+            ("last([])", "null"),
+            ("rest([1, 2, 3])", "[2, 3]"),
+            ("rest([1])", "[]"),
+            ("rest([])", "null"),
+            ("push([], 1)", "[1]"),
+        ]);
+        expect_errors(vec![
+            ("len(1)", "unsupported arguments to `len`: INTEGER"),
+            (
+                r#"len("one", "two")"#,
+                "wrong number of arguments: expected 1, given 2",
+            ),
+            ("first(1)", "unsupported arguments to `first`: INTEGER"),
+            ("last(1)", "unsupported arguments to `last`: INTEGER"),
+            (
+                "push(1, 1)",
+                "unsupported arguments to `push`: INTEGER, INTEGER",
             ),
         ]);
     }
