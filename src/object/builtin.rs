@@ -1,18 +1,43 @@
-use crate::object::{EvalError, EvalResult, Object, assert_argument_count};
+use crate::object::{assert_argument_count, EvalError, EvalResult, Object};
+
+// Builtin functions must have a static order in order to have static indices in compiled bytecodes.
+
+pub struct Builtin {
+    pub name: &'static str,
+    pub builtin: Object,
+}
+
+macro_rules! builtin {
+    ($name:ident) => {
+        Builtin {
+            name: stringify!($name),
+            builtin: Object::Builtin($name),
+        }
+    };
+}
+
+pub const BUILTINS: &'static [Builtin] = &[
+    builtin!(len),
+    builtin!(first),
+    builtin!(last),
+    builtin!(rest),
+    builtin!(push),
+    builtin!(puts),
+];
 
 pub fn lookup(name: &str) -> Option<Object> {
-    match name {
-        // TODO: Should `null` be a reserved word? Otherwise it can be overridden like `undefined`
-        // of JavaScript non-strict mode.
-        "null" => Some(Object::Null),
-        "len" => Some(Object::Builtin(len)),
-        "first" => Some(Object::Builtin(first)),
-        "last" => Some(Object::Builtin(last)),
-        "rest" => Some(Object::Builtin(rest)),
-        "push" => Some(Object::Builtin(push)),
-        "puts" => Some(Object::Builtin(puts)),
-        _ => None,
+    // TODO: Move `null` to somewhere else.
+    // TODO: Make `null` a reserved word. Otherwise it can be overridden like `undefined`
+    // of JavaScript non-strict mode.
+    if name == "null" {
+        return Some(Object::Null);
     }
+    for b in BUILTINS {
+        if b.name == name {
+            return Some(b.builtin.clone());
+        }
+    }
+    None
 }
 
 fn len(arguments: Vec<Object>) -> EvalResult {

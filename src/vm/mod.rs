@@ -292,6 +292,9 @@ impl Vm {
                     let local = Rc::clone(&self.stack[base_pointer + local_index]);
                     self.push(local)?;
                 }
+                Some(OpCode::GetBuiltin) => {
+                    unimplemented!();
+                }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
                 }

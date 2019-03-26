@@ -3,8 +3,8 @@ pub mod symbol_table;
 use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::code;
 use crate::code::{Instructions, OpCode};
-pub use crate::compiler::symbol_table::SymbolTable;
-use crate::object::{CompiledFunction, Object};
+pub use crate::compiler::symbol_table::{SymbolScope, SymbolTable};
+use crate::object::{builtin, CompiledFunction, Object};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -22,13 +22,14 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new() -> Self {
-        let main_scope = CompilationScope::new();
-        Compiler {
-            constants: Rc::new(RefCell::new(vec![])),
-            symbol_table: Rc::new(RefCell::new(SymbolTable::new())),
-            scopes: vec![main_scope],
-            scope_index: 0,
+        let mut symbol_table = SymbolTable::new();
+        for (i, b) in builtin::BUILTINS.iter().enumerate() {
+            symbol_table.define_builtin(i as u16, b.name);
         }
+
+        let constants = Rc::new(RefCell::new(vec![]));
+
+        Compiler::new_with_state(Rc::new(RefCell::new(symbol_table)), constants)
     }
 
     pub fn new_with_state(
@@ -36,6 +37,7 @@ impl Compiler {
         constants: Rc<RefCell<Vec<Rc<Object>>>>,
     ) -> Self {
         let main_scope = CompilationScope::new();
+
         Compiler {
             constants,
             symbol_table,
@@ -60,16 +62,22 @@ impl Compiler {
             Statement::Let(name, exp) => {
                 self.compile_expression(exp)?;
 
-                let (symbol_index, is_global) = {
+                let (symbol_index, scope) = {
                     let mut table = self.symbol_table.borrow_mut();
                     let symbol = table.define(name);
-                    (symbol.index, symbol.is_global())
+                    (symbol.index, symbol.scope)
                 };
 
-                if is_global {
-                    self.emit_with_operands(OpCode::SetGlobal, OpCode::u16(symbol_index));
-                } else {
-                    self.emit_with_operands(OpCode::SetLocal, vec![symbol_index as u8]);
+                match scope {
+                    SymbolScope::Global => {
+                        self.emit_with_operands(OpCode::SetGlobal, OpCode::u16(symbol_index));
+                    }
+                    SymbolScope::Local => {
+                        self.emit_with_operands(OpCode::SetLocal, vec![symbol_index as u8]);
+                    }
+                    SymbolScope::Builtin => {
+                        panic!("builtin cannot be defined by let statement");
+                    }
                 }
             }
             Statement::Return(None) => {
@@ -212,16 +220,22 @@ impl Compiler {
                 );
             }
             Expression::Identifier(name) => {
-                let (symbol_index, is_global) = {
+                let (symbol_index, scope) = {
                     match self.symbol_table.borrow().resolve(name) {
-                        Some(symbol) => (symbol.index, symbol.is_global()),
+                        Some(symbol) => (symbol.index, symbol.scope),
                         None => return Err(CompileError::UndefinedVariable(name.to_string())),
                     }
                 };
-                if is_global {
-                    self.emit_with_operands(OpCode::GetGlobal, OpCode::u16(symbol_index));
-                } else {
-                    self.emit_with_operands(OpCode::GetLocal, vec![symbol_index as u8]);
+                match scope {
+                    SymbolScope::Builtin => {
+                        self.emit_with_operands(OpCode::GetBuiltin, vec![symbol_index as u8]);
+                    }
+                    SymbolScope::Global => {
+                        self.emit_with_operands(OpCode::GetGlobal, OpCode::u16(symbol_index));
+                    }
+                    SymbolScope::Local => {
+                        self.emit_with_operands(OpCode::GetLocal, vec![symbol_index as u8]);
+                    }
                 }
             }
             Expression::Array(exps) => {
@@ -1019,6 +1033,45 @@ mod tests {
                     ),
                 ],
                 vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
+            ),
+        ]);
+    }
+
+    #[test]
+    fn builtin_functions() {
+        test_compile(vec![
+            (
+                "len([]); push([], 1);",
+                vec![Object::Integer(1)],
+                vec![
+                    make_u8(OpCode::GetBuiltin, 0),
+                    make_u16(OpCode::Array, 0),
+                    make_u8(OpCode::Call, 1),
+                    make(OpCode::Pop),
+                    make_u8(OpCode::GetBuiltin, 4),
+                    make_u16(OpCode::Array, 0),
+                    make_u16(OpCode::Constant, 0),
+                    make_u8(OpCode::Call, 2),
+                    make(OpCode::Pop),
+                ],
+            ),
+            (
+                "fn() { len([], 1); }",
+                vec![
+                    Object::Integer(1),
+                    compiled_function(
+                        0,
+                        0,
+                        vec![
+                            make_u8(OpCode::GetBuiltin, 0),
+                            make_u16(OpCode::Array, 0),
+                            make_u16(OpCode::Constant, 0),
+                            make_u8(OpCode::Call, 2),
+                            make(OpCode::ReturnValue),
+                        ],
+                    ),
+                ],
+                vec![make_u16(OpCode::Constant, 1), make(OpCode::Pop)],
             ),
         ]);
     }

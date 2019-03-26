@@ -81,7 +81,8 @@ byte_enum!(
         ReturnValue,
         Return,
         GetLocal,
-        SetLocal
+        SetLocal,
+        GetBuiltin
     ]
 );
 
@@ -261,6 +262,10 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
         },
         OpCode::SetLocal => Definition {
             name: "OpSetLocal".to_string(),
+            widths: vec![1],
+        },
+        OpCode::GetBuiltin => Definition {
+            name: "OpGetBuiltin".to_string(),
             widths: vec![1],
         },
     })

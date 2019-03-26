@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::mem;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum SymbolScope {
     Global,
     Local,
+    Builtin,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -14,37 +15,49 @@ pub struct Symbol {
     pub index: u16,
 }
 
-impl Symbol {
-    pub fn is_global(&self) -> bool {
-        self.scope == SymbolScope::Global
+// TODO: Better naming.
+struct SymbolLayer {
+    store: HashMap<String, Symbol>,
+
+    // Keep track of non-builtin definitions.
+    num_definitions: u16,
+}
+
+impl SymbolLayer {
+    pub fn new() -> Self {
+        SymbolLayer {
+            store: HashMap::new(),
+            num_definitions: 0,
+        }
     }
 }
 
 pub struct SymbolTable {
     // The innermost store.
-    store: HashMap<String, Symbol>,
+    current: SymbolLayer,
+
     // The stack of outer stores. The first item is the outermost one (global) and the last item is
     // the 2nd innermost one.
-    outers: Vec<HashMap<String, Symbol>>,
+    outers: Vec<SymbolLayer>,
 }
 
 impl SymbolTable {
     pub fn new() -> Self {
         SymbolTable {
-            store: HashMap::new(),
+            current: SymbolLayer::new(),
             outers: vec![],
         }
     }
 
     pub fn push(&mut self) {
-        let outer = mem::replace(&mut self.store, HashMap::new());
+        let outer = mem::replace(&mut self.current, SymbolLayer::new());
         self.outers.push(outer);
     }
 
     pub fn pop(&mut self) {
         match self.outers.pop() {
             Some(outer) => {
-                mem::replace(&mut self.store, outer);
+                mem::replace(&mut self.current, outer);
             }
             None => {}
         }
@@ -59,19 +72,33 @@ impl SymbolTable {
         };
         let symbol = Symbol {
             name: name.to_string(),
-            index: self.store.len() as u16,
+            index: self.current.num_definitions,
             scope,
         };
+        self.current.num_definitions += 1;
 
-        self.store.insert(name.to_string(), symbol);
-        self.store.get(name).expect("inserted just now")
+        self.define_symbol(name, symbol)
+    }
+
+    pub fn define_builtin(&mut self, index: u16, name: &str) -> &Symbol {
+        if self.outers.len() > 0 {
+            panic!("builtin can be defined only on top-level scope");
+        }
+
+        let symbol = Symbol {
+            name: name.to_string(),
+            index,
+            scope: SymbolScope::Builtin,
+        };
+
+        self.define_symbol(name, symbol)
     }
 
     pub fn resolve(&self, name: &str) -> Option<&Symbol> {
-        self.store.get(name).or_else(|| {
+        self.current.store.get(name).or_else(|| {
             // Try from the 2nd innermost store to the outermost one.
             for outer in self.outers.iter().rev() {
-                if let Some(symbol) = outer.get(name) {
+                if let Some(symbol) = outer.store.get(name) {
                     return Some(symbol);
                 }
             }
@@ -79,8 +106,13 @@ impl SymbolTable {
         })
     }
 
-    pub fn num_definitions(&self) -> usize {
-        self.store.len()
+    pub fn num_definitions(&self) -> u16 {
+        self.current.num_definitions
+    }
+
+    fn define_symbol(&mut self, name: &str, symbol: Symbol) -> &Symbol {
+        self.current.store.insert(name.to_string(), symbol);
+        self.current.store.get(name).expect("inserted just now")
     }
 }
 
@@ -162,7 +194,7 @@ mod tests {
 
         test_resolve(
             &global,
-            vec![
+            &vec![
                 Symbol {
                     name: "a".to_string(),
                     scope: SymbolScope::Global,
@@ -189,7 +221,7 @@ mod tests {
 
         test_resolve(
             &table,
-            vec![
+            &vec![
                 Symbol {
                     name: "a".to_string(),
                     scope: SymbolScope::Global,
@@ -226,7 +258,7 @@ mod tests {
 
         test_resolve(
             &table,
-            vec![
+            &vec![
                 Symbol {
                     name: "a".to_string(),
                     scope: SymbolScope::Global,
@@ -256,7 +288,7 @@ mod tests {
 
         test_resolve(
             &table,
-            vec![
+            &vec![
                 Symbol {
                     name: "a".to_string(),
                     scope: SymbolScope::Global,
@@ -281,12 +313,40 @@ mod tests {
         );
     }
 
-    fn test_resolve(table: &SymbolTable, expected: Vec<Symbol>) {
+    #[test]
+    fn resolve_builtin() {
+        let mut table = SymbolTable::new();
+        table.define_builtin(0, "a");
+        table.define_builtin(1, "b");
+
+        let tests = vec![
+            Symbol {
+                name: "a".to_string(),
+                scope: SymbolScope::Builtin,
+                index: 0,
+            },
+            Symbol {
+                name: "b".to_string(),
+                scope: SymbolScope::Builtin,
+                index: 1,
+            },
+        ];
+
+        test_resolve(&table, &tests);
+
+        table.push();
+        test_resolve(&table, &tests);
+
+        table.push();
+        test_resolve(&table, &tests);
+    }
+
+    fn test_resolve(table: &SymbolTable, expected: &Vec<Symbol>) {
         for symbol in expected {
             let resolved = table
                 .resolve(&symbol.name)
                 .expect(&format!("expected `{}` to be resolved", symbol.name));
-            assert_eq!(resolved, &symbol);
+            assert_eq!(resolved, symbol);
         }
     }
 }
