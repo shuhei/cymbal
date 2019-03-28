@@ -300,6 +300,9 @@ impl Vm {
 
                     self.push(builtin_function)?;
                 }
+                Some(OpCode::Closure) => {
+                    unimplemented!();
+                }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
                 }

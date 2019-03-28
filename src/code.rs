@@ -82,7 +82,8 @@ byte_enum!(
         Return,
         GetLocal,
         SetLocal,
-        GetBuiltin
+        GetBuiltin,
+        Closure
     ]
 );
 
@@ -151,6 +152,11 @@ pub fn make_u8(op_code: OpCode, operand: u8) -> Instructions {
 pub fn make_u16(op_code: OpCode, operand: u16) -> Instructions {
     let bytes = u16::to_be_bytes(operand);
     vec![op_code as u8, bytes[0], bytes[1]]
+}
+
+pub fn make_u16_u8(op_code: OpCode, first: u16, second: u8) -> Instructions {
+    let bytes = u16::to_be_bytes(first);
+    vec![op_code as u8, bytes[0], bytes[1], second]
 }
 
 pub struct Definition {
@@ -268,12 +274,16 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
             name: "OpGetBuiltin".to_string(),
             widths: vec![1],
         },
+        OpCode::Closure => Definition {
+            name: "OpClosure".to_string(),
+            widths: vec![2, 1],
+        },
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::code::{make, make_u16, make_u8, print_instructions, OpCode};
+    use crate::code::{make, make_u16, make_u16_u8, make_u8, print_instructions, OpCode};
 
     #[test]
     fn test_print_instructions() {
@@ -282,6 +292,7 @@ mod tests {
             make_u16(OpCode::Constant, 2),
             make_u16(OpCode::Constant, 65535),
             make_u8(OpCode::GetLocal, 1),
+            make_u16_u8(OpCode::Closure, 65535, 255),
             make(OpCode::Pop),
         ]
         .concat();
@@ -289,7 +300,8 @@ mod tests {
 0003 OpConstant 2
 0006 OpConstant 65535
 0009 OpGetLocal 1
-0011 OpPop";
+0011 OpClosure 65535 255
+0015 OpPop";
 
         assert_eq!(&print_instructions(&insts), expected);
     }

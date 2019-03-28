@@ -25,6 +25,7 @@ pub enum Object {
     Function(Vec<String>, BlockStatement, Rc<RefCell<Environment>>),
     Builtin(BuiltinFunction),
     CompiledFunction(CompiledFunction),
+    Closure(CompiledFunction, Vec<Object>),
 }
 
 impl fmt::Display for Object {
@@ -33,15 +34,7 @@ impl fmt::Display for Object {
             Object::Boolean(value) => write!(f, "{}", value),
             Object::Integer(value) => write!(f, "{}", value),
             Object::String(value) => write!(f, "\"{}\"", value),
-            Object::Array(values) => write!(
-                f,
-                "[{}]",
-                values
-                    .iter()
-                    .map(|v| v.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
+            Object::Array(values) => write!(f, "[{}]", print_objects(values),),
             Object::Hash(pairs) => {
                 // Print keys with a stable order for testing.
                 let mut items = pairs
@@ -63,8 +56,22 @@ impl fmt::Display for Object {
                 cf.num_locals,
                 code::print_instructions(&cf.instructions)
             ),
+            Object::Closure(cf, free) => write!(
+                f,
+                "closure ({}) ({}): {}",
+                cf.num_locals,
+                print_objects(free),
+                code::print_instructions(&cf.instructions),
+            ),
         }
     }
+}
+
+fn print_objects(objs: &Vec<Object>) -> String {
+    objs.iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<String>>()
+        .join(", ")
 }
 
 impl Object {
@@ -80,6 +87,7 @@ impl Object {
             Object::Function(_, _, _) => "FUNCTION",
             Object::Builtin(_) => "BUILTIN",
             Object::CompiledFunction(_) => "COMPILED_FUNCTION",
+            Object::Closure(_, _) => "CLOSURE",
         }
     }
 
