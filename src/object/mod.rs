@@ -25,7 +25,7 @@ pub enum Object {
     Function(Vec<String>, BlockStatement, Rc<RefCell<Environment>>),
     Builtin(BuiltinFunction),
     CompiledFunction(CompiledFunction),
-    Closure(CompiledFunction, Vec<Object>),
+    Closure(Closure),
 }
 
 impl fmt::Display for Object {
@@ -56,12 +56,12 @@ impl fmt::Display for Object {
                 cf.num_locals,
                 code::print_instructions(&cf.instructions)
             ),
-            Object::Closure(cf, free) => write!(
+            Object::Closure(closure) => write!(
                 f,
                 "closure ({}) ({}): {}",
-                cf.num_locals,
-                print_objects(free),
-                code::print_instructions(&cf.instructions),
+                closure.func.num_locals,
+                print_objects(&closure.free),
+                code::print_instructions(&closure.func.instructions),
             ),
         }
     }
@@ -87,7 +87,7 @@ impl Object {
             Object::Function(_, _, _) => "FUNCTION",
             Object::Builtin(_) => "BUILTIN",
             Object::CompiledFunction(_) => "COMPILED_FUNCTION",
-            Object::Closure(_, _) => "CLOSURE",
+            Object::Closure(_) => "CLOSURE",
         }
     }
 
@@ -137,12 +137,18 @@ pub struct CompiledFunction {
     pub num_parameters: u8,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Closure {
+    pub func: CompiledFunction,
+    pub free: Vec<Object>,
+}
+
 pub enum EvalError {
     TypeMismatch(Infix, Object, Object),
     UnknownPrefixOperator(Prefix, Object),
     UnknownInfixOperator(Infix, Object, Object),
     IdentifierNotFound(String),
-    NotFunction(Object),
+    NotCallable(Object),
     WrongArgumentCount { expected: usize, given: usize },
     UnsupportedArguments(String, Vec<Object>),
     UnknownIndexOperator(Object, Object),
@@ -170,7 +176,7 @@ impl fmt::Display for EvalError {
                 right.type_name()
             ),
             EvalError::IdentifierNotFound(name) => write!(f, "identifier not found: {}", name),
-            EvalError::NotFunction(obj) => write!(f, "not a function: {}", obj.type_name()),
+            EvalError::NotCallable(obj) => write!(f, "not a closure or a builtin function: {}", obj.type_name()),
             EvalError::WrongArgumentCount { expected, given } => write!(
                 f,
                 "wrong number of arguments: expected {}, given {}",

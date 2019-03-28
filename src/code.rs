@@ -92,6 +92,11 @@ impl OpCode {
         let bytes = i.to_be_bytes();
         vec![bytes[0], bytes[1]]
     }
+
+    pub fn u16_u8(first: u16, second: u8) -> Vec<u8> {
+        let bytes = first.to_be_bytes();
+        vec![bytes[0], bytes[1], second]
+    }
 }
 
 pub fn print_instructions(insts: &Instructions) -> String {

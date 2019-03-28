@@ -296,7 +296,7 @@ impl Compiler {
                     num_parameters: params.len() as u8,
                 }));
                 let const_index = self.add_constant(compiled_function);
-                self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
+                self.emit_with_operands(OpCode::Closure, OpCode::u16_u8(const_index, 0));
             }
             Expression::Call(func, args) => {
                 self.compile_expression(func)?;
@@ -482,7 +482,9 @@ pub struct Bytecode {
 mod tests {
     use super::Compiler;
     use crate::ast::Program;
-    use crate::code::{make, make_u16, make_u8, print_instructions, Instructions, OpCode};
+    use crate::code::{
+        make, make_u16, make_u16_u8, make_u8, print_instructions, Instructions, OpCode,
+    };
     use crate::lexer::Lexer;
     use crate::object::{CompiledFunction, Object};
     use crate::parser::Parser;
@@ -840,7 +842,7 @@ mod tests {
                         ],
                     ),
                 ],
-                vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
+                vec![make_u16_u8(OpCode::Closure, 2, 0), make(OpCode::Pop)],
             ),
             (
                 "fn() { 5 + 10 }",
@@ -858,7 +860,7 @@ mod tests {
                         ],
                     ),
                 ],
-                vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
+                vec![make_u16_u8(OpCode::Closure, 2, 0), make(OpCode::Pop)],
             ),
             (
                 "fn() { 1; 2 }",
@@ -876,12 +878,12 @@ mod tests {
                         ],
                     ),
                 ],
-                vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
+                vec![make_u16_u8(OpCode::Closure, 2, 0), make(OpCode::Pop)],
             ),
             (
                 "fn() { }",
                 vec![compiled_function(0, 0, vec![make(OpCode::Return)])],
-                vec![make_u16(OpCode::Constant, 0), make(OpCode::Pop)],
+                vec![make_u16_u8(OpCode::Closure, 0, 0), make(OpCode::Pop)],
             ),
         ]);
     }
@@ -900,7 +902,7 @@ mod tests {
                     ),
                 ],
                 vec![
-                    make_u16(OpCode::Constant, 1),
+                    make_u16_u8(OpCode::Closure, 1, 0),
                     make_u8(OpCode::Call, 0),
                     make(OpCode::Pop),
                 ],
@@ -916,7 +918,7 @@ mod tests {
                     ),
                 ],
                 vec![
-                    make_u16(OpCode::Constant, 1),
+                    make_u16_u8(OpCode::Closure, 1, 0),
                     make_u16(OpCode::SetGlobal, 0),
                     make_u16(OpCode::GetGlobal, 0),
                     make_u8(OpCode::Call, 0),
@@ -934,7 +936,7 @@ mod tests {
                     Object::Integer(24),
                 ],
                 vec![
-                    make_u16(OpCode::Constant, 0),
+                    make_u16_u8(OpCode::Closure, 0, 0),
                     make_u16(OpCode::SetGlobal, 0),
                     make_u16(OpCode::GetGlobal, 0),
                     make_u16(OpCode::Constant, 1),
@@ -962,7 +964,7 @@ mod tests {
                     Object::Integer(26),
                 ],
                 vec![
-                    make_u16(OpCode::Constant, 0),
+                    make_u16_u8(OpCode::Closure, 0, 0),
                     make_u16(OpCode::SetGlobal, 0),
                     make_u16(OpCode::GetGlobal, 0),
                     make_u16(OpCode::Constant, 1),
@@ -991,7 +993,7 @@ mod tests {
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::SetGlobal, 0),
-                    make_u16(OpCode::Constant, 1),
+                    make_u16_u8(OpCode::Closure, 1, 0),
                     make(OpCode::Pop),
                 ],
             ),
@@ -1029,7 +1031,7 @@ mod tests {
                         ],
                     ),
                 ],
-                vec![make_u16(OpCode::Constant, 2), make(OpCode::Pop)],
+                vec![make_u16_u8(OpCode::Closure, 2, 0), make(OpCode::Pop)],
             ),
         ]);
     }
@@ -1068,7 +1070,7 @@ mod tests {
                         ],
                     ),
                 ],
-                vec![make_u16(OpCode::Constant, 1), make(OpCode::Pop)],
+                vec![make_u16_u8(OpCode::Closure, 1, 0), make(OpCode::Pop)],
             ),
         ]);
     }

@@ -4,7 +4,9 @@ use crate::ast::{Infix, Prefix};
 use crate::code;
 use crate::code::{Instructions, OpCode};
 use crate::compiler::Bytecode;
-use crate::object::{builtin, BuiltinFunction, CompiledFunction, EvalError, HashKey, Object};
+use crate::object::{
+    builtin, BuiltinFunction, Closure, CompiledFunction, EvalError, HashKey, Object,
+};
 pub use crate::vm::frame::Frame;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -35,14 +37,16 @@ pub fn new_globals() -> Vec<Rc<Object>> {
 }
 
 fn new_frames(instructions: Instructions) -> Vec<Frame> {
-    let main_frame = Frame::new(
-        CompiledFunction {
-            instructions,
-            num_locals: 0,
-            num_parameters: 0,
-        },
-        0,
-    );
+    let main_function = CompiledFunction {
+        instructions,
+        num_locals: 0,
+        num_parameters: 0,
+    };
+    let main_closure = Closure {
+        func: main_function,
+        free: vec![],
+    };
+    let main_frame = Frame::new(main_closure, 0);
     let mut frames = Vec::with_capacity(MAX_FRAMES);
     frames.push(main_frame);
     frames
@@ -301,7 +305,26 @@ impl Vm {
                     self.push(builtin_function)?;
                 }
                 Some(OpCode::Closure) => {
-                    unimplemented!();
+                    let const_index = code::read_uint16(ins, ip + 1) as usize;
+                    let _free_count = ins[ip + 3] as usize;
+                    self.increment_ip(3);
+
+                    let len = self.constants.borrow().len();
+                    if const_index < len {
+                        let constant = { Rc::clone(&self.constants.borrow()[const_index]) };
+                        // TODO: Don't clone Rc!
+                        if let Object::CompiledFunction(cf) = (*constant).clone() {
+                            let closure = Closure {
+                                func: cf,
+                                free: vec![],
+                            };
+                            self.push(Rc::new(Object::Closure(closure)))?;
+                        } else {
+                            return Err(VmError::NotFunction(Rc::clone(&constant)));
+                        }
+                    } else {
+                        return Err(VmError::InvalidConstIndex(const_index, len));
+                    }
                 }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
@@ -426,10 +449,11 @@ impl Vm {
 
     fn execute_call(&mut self, num_args: usize) -> Result<(), VmError> {
         // TODO: Don't clone...
-        match (*self.stack[self.sp - num_args - 1]).clone() {
-            Object::CompiledFunction(func) => self.call_function(num_args, func),
+        let callee = (*self.stack[self.sp - num_args - 1]).clone();
+        match callee {
+            Object::Closure(closure) => self.call_closure(num_args, closure),
             Object::Builtin(func) => self.call_builtin(num_args, func),
-            obj => return Err(VmError::Eval(EvalError::NotFunction(obj))),
+            obj => return Err(VmError::Eval(EvalError::NotCallable(obj))),
         }
     }
 
@@ -441,18 +465,18 @@ impl Vm {
     //        | function |
     //        |   ....   |
     //
-    fn call_function(&mut self, num_args: usize, func: CompiledFunction) -> Result<(), VmError> {
-        if func.num_parameters as usize != num_args {
+    fn call_closure(&mut self, num_args: usize, closure: Closure) -> Result<(), VmError> {
+        if closure.func.num_parameters as usize != num_args {
             return Err(VmError::Eval(EvalError::WrongArgumentCount {
-                expected: func.num_parameters as usize,
+                expected: closure.func.num_parameters as usize,
                 given: num_args,
             }));
         }
 
-        let num_locals = func.num_locals as usize;
+        let num_locals = closure.func.num_locals as usize;
         let base_pointer = self.sp - num_args;
         // Keep the stack pointer to come back after calling the function.
-        self.push_frame(Frame::new(func, base_pointer));
+        self.push_frame(Frame::new(closure, base_pointer));
 
         // Reserve space for local bindings.
         // `num_locals` includes `num_args` in itself.
@@ -541,6 +565,7 @@ pub enum VmError {
     InvalidConstIndex(usize, usize),
     StackOverflow,
     StackEmpty,
+    NotFunction(Rc<Object>),
     Eval(EvalError),
 }
 
@@ -553,6 +578,7 @@ impl fmt::Display for VmError {
             }
             VmError::StackOverflow => write!(f, "stack overflow"),
             VmError::StackEmpty => write!(f, "stack empty"),
+            VmError::NotFunction(obj) => write!(f, "not a function: {}", obj.type_name()),
             VmError::Eval(eval_error) => write!(f, "{}", eval_error),
         }
     }

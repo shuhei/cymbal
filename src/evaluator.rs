@@ -138,7 +138,7 @@ fn apply_function(function: Object, arguments: Vec<Object>) -> EvalResult {
             unwrap_return_value(evaluated)
         }
         Object::Builtin(func) => func(arguments),
-        _ => Err(EvalError::NotFunction(function.clone())),
+        _ => Err(EvalError::NotCallable(function.clone())),
     }
 }
 

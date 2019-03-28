@@ -1,23 +1,23 @@
 use crate::code::Instructions;
-use crate::object::CompiledFunction;
+use crate::object::Closure;
 
 #[derive(Debug)]
 pub struct Frame {
-    func: CompiledFunction,
+    closure: Closure,
     pub ip: usize,
     pub base_pointer: usize,
 }
 
 impl Frame {
-    pub fn new(func: CompiledFunction, base_pointer: usize) -> Self {
+    pub fn new(closure: Closure, base_pointer: usize) -> Self {
         Frame {
-            func,
+            closure,
             ip: 0,
             base_pointer,
         }
     }
 
     pub fn instructions(&self) -> &Instructions {
-        &self.func.instructions
+        &self.closure.func.instructions
     }
 }
