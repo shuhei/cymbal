@@ -1,6 +1,6 @@
 # Cymbal
 
-Yet another Rust implementation of the Monkey language from "Writing an Interpreter in Go."
+Yet another Rust implementation of the Monkey language from "Writing an Interpreter in Go" and "Writing a Compiler in Go."
 
 [![CircleCI](https://circleci.com/gh/shuhei/cymbal.svg?style=svg)](https://circleci.com/gh/shuhei/cymbal)
 
