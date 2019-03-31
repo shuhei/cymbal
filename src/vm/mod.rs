@@ -892,14 +892,68 @@ mod tests {
 
     #[test]
     fn closures() {
-        expect_values(vec![(
-            "let newClosure = fn(a) {
+        expect_values(vec![
+            (
+                "let newClosure = fn(a) {
                  fn() { a; };
              };
              let closure = newClosure(99);
              closure();",
-            "99",
-        )]);
+                "99",
+            ),
+            (
+                "let newAdder = fn(a, b) {
+                     fn(c) { a + b + c; };
+                 };
+                 let adder = newAdder(1, 2);
+                 adder(8);",
+                "11",
+            ),
+            (
+                "let newAdder = fn(a, b) {
+                     let c = a + b;
+                     fn(d) { c + d; };
+                 };
+                 let adder = newAdder(1, 2);
+                 adder(8);",
+                "11",
+            ),
+            (
+                "let newAdderOuter = fn(a, b) {
+                     let c = a + b;
+                     fn(d) {
+                         let e = c + d;
+                         fn(f) { e + f };
+                     };
+                 };
+                 let newAdderInner = newAdderOuter(1, 2);
+                 let adder = newAdderInner(3);
+                 adder(8);",
+                "14",
+            ),
+            (
+                "let a = 1;
+                 let newAdderOuter = fn(b) {
+                     fn(c) {
+                         fn(d) { a + b + c + d };
+                     };
+                 };
+                 let newAdderInner = newAdderOuter(2);
+                 let adder = newAdderInner(3);
+                 adder(8);",
+                "14",
+            ),
+            (
+                "let newClosure = fn(a, b) {
+                     let one = fn() { a; };
+                     let two = fn() { b; };
+                     fn() { one() + two(); }
+                 };
+                 let closure = newClosure(1, 2);
+                 closure();",
+                "3",
+            ),
+        ]);
     }
 
     fn expect_values(tests: Vec<(&str, &str)>) {
