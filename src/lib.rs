@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod benchmark;
 pub mod code;
 pub mod compiler;
 pub mod evaluator;

@@ -1,19 +1,16 @@
-use std::env;
-use cymbal::compiler::{Compiler, SymbolTable};
-use cymbal::evaluator;
-use cymbal::mode::Mode;
-use cymbal::lexer::Lexer;
-use cymbal::object::Environment;
-use cymbal::parser::Parser;
-use cymbal::vm;
-use cymbal::vm::Vm;
-use std::rc::Rc;
+use crate::compiler::{Compiler, SymbolTable};
+use crate::evaluator;
+use crate::lexer::Lexer;
+use crate::mode::Mode;
+use crate::object::Environment;
+use crate::parser::Parser;
+use crate::vm::Vm;
+use crate::vm;
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::time::Instant;
 
-fn main() {
-    let mode = get_mode();
-
+pub fn run(mode: Mode) {
     let code =
         "let fibonacci = fn(x) {
              if (x == 0) {
@@ -60,16 +57,4 @@ fn main() {
             println!("{} seconds {} nanoseconds, result: {}", elapsed.as_secs(), elapsed.subsec_nanos(), result);
         }
     }
-}
-
-fn get_mode() -> Mode {
-    for arg in env::args() {
-        if arg == "--eval" {
-            return Mode::Eval;
-        }
-        if arg == "--compile" {
-            return Mode::Compile;
-        }
-    }
-    panic!("use `--eval` or `--compile`");
 }
