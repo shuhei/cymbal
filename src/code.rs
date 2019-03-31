@@ -83,7 +83,8 @@ byte_enum!(
         GetLocal,
         SetLocal,
         GetBuiltin,
-        Closure
+        Closure,
+        GetFree
     ]
 );
 
@@ -283,6 +284,10 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
             name: "OpClosure".to_string(),
             widths: vec![2, 1],
         },
+        OpCode::GetFree => Definition {
+            name: "OpGetFree".to_string(),
+            widths: vec![1],
+        }
     })
 }
 

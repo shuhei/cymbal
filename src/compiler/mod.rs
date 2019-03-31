@@ -3,7 +3,7 @@ pub mod symbol_table;
 use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::code;
 use crate::code::{Instructions, OpCode};
-pub use crate::compiler::symbol_table::{SymbolScope, SymbolTable};
+pub use crate::compiler::symbol_table::{Symbol, SymbolScope, SymbolTable};
 use crate::object::{CompiledFunction, Object};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -71,6 +71,9 @@ impl Compiler {
                     }
                     SymbolScope::Local => {
                         self.emit_with_operands(OpCode::SetLocal, vec![symbol_index as u8]);
+                    }
+                    SymbolScope::Free => {
+                        panic!("free cannot be defined by let statement");
                     }
                     SymbolScope::Builtin => {
                         panic!("builtin cannot be defined by let statement");
@@ -218,22 +221,12 @@ impl Compiler {
             }
             Expression::Identifier(name) => {
                 let (symbol_index, scope) = {
-                    match self.symbol_table.borrow().resolve(name) {
+                    match self.symbol_table.borrow_mut().resolve(name) {
                         Some(symbol) => (symbol.index, symbol.scope),
                         None => return Err(CompileError::UndefinedVariable(name.to_string())),
                     }
                 };
-                match scope {
-                    SymbolScope::Builtin => {
-                        self.emit_with_operands(OpCode::GetBuiltin, vec![symbol_index as u8]);
-                    }
-                    SymbolScope::Global => {
-                        self.emit_with_operands(OpCode::GetGlobal, OpCode::u16(symbol_index));
-                    }
-                    SymbolScope::Local => {
-                        self.emit_with_operands(OpCode::GetLocal, vec![symbol_index as u8]);
-                    }
-                }
+                self.load_symbol(scope, symbol_index);
             }
             Expression::Array(exps) => {
                 for exp in exps {
@@ -287,7 +280,14 @@ impl Compiler {
 
                 // TODO: Check too many local bindings.
                 let num_locals = self.symbol_table.borrow().num_definitions() as u8;
-                let instructions = self.leave_scope();
+                // TODO: Check too many free variables.
+                let (instructions, free_symbols) = self.leave_scope();
+
+                // Load free variables before the OpCode::Closure so that the VM can build a closure
+                // with free variables.
+                for free in &free_symbols {
+                    self.load_symbol(free.scope, free.index);
+                }
 
                 let compiled_function = Rc::new(Object::CompiledFunction(CompiledFunction {
                     instructions,
@@ -296,7 +296,10 @@ impl Compiler {
                     num_parameters: params.len() as u8,
                 }));
                 let const_index = self.add_constant(compiled_function);
-                self.emit_with_operands(OpCode::Closure, OpCode::u16_u8(const_index, 0));
+                self.emit_with_operands(
+                    OpCode::Closure,
+                    OpCode::u16_u8(const_index, free_symbols.len() as u8),
+                );
             }
             Expression::Call(func, args) => {
                 self.compile_expression(func)?;
@@ -327,13 +330,13 @@ impl Compiler {
         self.symbol_table.borrow_mut().push();
     }
 
-    fn leave_scope(&mut self) -> Instructions {
+    fn leave_scope(&mut self) -> (Instructions, Vec<Symbol>) {
         let scope = self.scopes.pop().expect("no scope to leave from");
         self.scope_index -= 1;
 
-        self.symbol_table.borrow_mut().pop();
+        let free_symbols = self.symbol_table.borrow_mut().pop();
 
-        return scope.instructions;
+        (scope.instructions, free_symbols)
     }
 
     fn add_constant(&mut self, constant: Rc<Object>) -> u16 {
@@ -371,6 +374,23 @@ impl Compiler {
 
     fn replace_last_pop_with_return(&mut self) {
         self.scopes[self.scope_index].replace_last_pop_with_return()
+    }
+
+    fn load_symbol(&mut self, scope: SymbolScope, symbol_index: u16) {
+        match scope {
+            SymbolScope::Builtin => {
+                self.emit_with_operands(OpCode::GetBuiltin, vec![symbol_index as u8]);
+            }
+            SymbolScope::Global => {
+                self.emit_with_operands(OpCode::GetGlobal, OpCode::u16(symbol_index));
+            }
+            SymbolScope::Free => {
+                self.emit_with_operands(OpCode::GetFree, vec![symbol_index as u8]);
+            }
+            SymbolScope::Local => {
+                self.emit_with_operands(OpCode::GetLocal, vec![symbol_index as u8]);
+            }
+        }
     }
 
     pub fn bytecode(self) -> Bytecode {
@@ -1075,6 +1095,139 @@ mod tests {
         ]);
     }
 
+    #[test]
+    fn closures() {
+        test_compile(vec![
+            (
+                "fn(a) { fn (b) { a + b } }",
+                vec![
+                    compiled_function(
+                        1,
+                        1,
+                        vec![
+                            make_u8(OpCode::GetFree, 0),
+                            make_u8(OpCode::GetLocal, 0),
+                            make(OpCode::Add),
+                            make(OpCode::ReturnValue),
+                        ],
+                    ),
+                    compiled_function(
+                        1,
+                        1,
+                        vec![
+                            make_u8(OpCode::GetLocal, 0),
+                            make_u16_u8(OpCode::Closure, 0, 1),
+                            make(OpCode::ReturnValue),
+                        ],
+                    ),
+                ],
+                vec![make_u16_u8(OpCode::Closure, 1, 0), make(OpCode::Pop)],
+            ),
+            (
+                "fn(a) { fn(b) { fn(c) { a + b + c } } }",
+                vec![
+                    compiled_function(
+                        1,
+                        1,
+                        vec![
+                            make_u8(OpCode::GetFree, 0),
+                            make_u8(OpCode::GetFree, 1),
+                            make(OpCode::Add),
+                            make_u8(OpCode::GetLocal, 0),
+                            make(OpCode::Add),
+                            make(OpCode::ReturnValue),
+                        ],
+                    ),
+                    compiled_function(
+                        1,
+                        1,
+                        vec![
+                            // TODO: This is resolved as a local. Why?
+                            make_u8(OpCode::GetFree, 0),
+                            make_u8(OpCode::GetLocal, 0),
+                            make_u16_u8(OpCode::Closure, 0, 2),
+                            make(OpCode::ReturnValue),
+                        ],
+                    ),
+                    compiled_function(
+                        1,
+                        1,
+                        vec![
+                            make_u8(OpCode::GetLocal, 0),
+                            make_u16_u8(OpCode::Closure, 1, 1),
+                            make(OpCode::ReturnValue),
+                        ],
+                    ),
+                ],
+                vec![make_u16_u8(OpCode::Closure, 2, 0), make(OpCode::Pop)],
+            ),
+            (
+                "let global = 55;
+                 fn() {
+                     let a = 66;
+                     fn() {
+                         let b = 77;
+                         fn() {
+                             let c = 88;
+                             global + a + b + c
+                         }
+                     }
+                 }",
+                vec![
+                    Object::Integer(55),
+                    Object::Integer(66),
+                    Object::Integer(77),
+                    Object::Integer(88),
+                    compiled_function(
+                        1,
+                        0,
+                        vec![
+                            make_u16(OpCode::Constant, 3),
+                            make_u8(OpCode::SetLocal, 0),
+                            make_u16(OpCode::GetGlobal, 0),
+                            make_u8(OpCode::GetFree, 0),
+                            make(OpCode::Add),
+                            make_u8(OpCode::GetFree, 1),
+                            make(OpCode::Add),
+                            make_u8(OpCode::GetLocal, 0),
+                            make(OpCode::Add),
+                            make(OpCode::ReturnValue),
+                        ],
+                    ),
+                    compiled_function(
+                        1,
+                        0,
+                        vec![
+                            make_u16(OpCode::Constant, 2),
+                            make_u8(OpCode::SetLocal, 0),
+                            make_u8(OpCode::GetFree, 0),
+                            make_u8(OpCode::GetLocal, 0),
+                            make_u16_u8(OpCode::Closure, 4, 2),
+                            make(OpCode::ReturnValue),
+                        ],
+                    ),
+                    compiled_function(
+                        1,
+                        0,
+                        vec![
+                            make_u16(OpCode::Constant, 1),
+                            make_u8(OpCode::SetLocal, 0),
+                            make_u8(OpCode::GetLocal, 0),
+                            make_u16_u8(OpCode::Closure, 5, 1),
+                            make(OpCode::ReturnValue),
+                        ],
+                    ),
+                ],
+                vec![
+                    make_u16(OpCode::Constant, 0),
+                    make_u16(OpCode::SetGlobal, 0),
+                    make_u16_u8(OpCode::Closure, 6, 0),
+                    make(OpCode::Pop),
+                ],
+            ),
+        ]);
+    }
+
     fn test_compile(tests: Vec<(&str, Vec<Object>, Vec<Instructions>)>) {
         for (input, expected_constants, expected_instructions) in tests {
             let program = parse(input);
@@ -1103,7 +1256,32 @@ mod tests {
                     con.clone()
                 })
                 .collect::<Vec<Object>>();
-            assert_eq!(constants, expected_constants, "\nfor {}", input);
+            if constants.len() != expected_constants.len() {
+                assert_eq!(constants, expected_constants, "\nfor {}", input);
+            }
+            // Pretty-print instructions in error messages
+            for (i, (constant, expected_constant)) in
+                constants.iter().zip(expected_constants.iter()).enumerate()
+            {
+                match (constant, expected_constant) {
+                    (Object::CompiledFunction(actual), Object::CompiledFunction(expected)) => {
+                        assert_eq!(
+                            actual.to_string(),
+                            expected.to_string(),
+                            "\nconstant (index {}) for {}",
+                            i,
+                            input
+                        );
+                    }
+                    _ => {
+                        assert_eq!(
+                            constant, expected_constant,
+                            "\nconstant (index {}) for {}",
+                            i, input
+                        );
+                    }
+                }
+            }
         }
     }
 

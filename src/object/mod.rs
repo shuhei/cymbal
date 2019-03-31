@@ -50,12 +50,7 @@ impl fmt::Display for Object {
                 write!(f, "fn({}) {{\n{}\n}}", params.join(", "), body)
             }
             Object::Builtin(_) => write!(f, "builtin function"),
-            Object::CompiledFunction(cf) => write!(
-                f,
-                "compiled function ({}): {}",
-                cf.num_locals,
-                code::print_instructions(&cf.instructions)
-            ),
+            Object::CompiledFunction(cf) => write!(f, "{}", cf),
             Object::Closure(closure) => write!(
                 f,
                 "closure ({}) ({}): {}",
@@ -137,6 +132,18 @@ pub struct CompiledFunction {
     pub num_parameters: u8,
 }
 
+impl fmt::Display for CompiledFunction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "compiled function ({} locals, {} parameters): {}",
+            self.num_locals,
+            self.num_parameters,
+            code::print_instructions(&self.instructions)
+        )
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Closure {
     pub func: CompiledFunction,
@@ -176,7 +183,11 @@ impl fmt::Display for EvalError {
                 right.type_name()
             ),
             EvalError::IdentifierNotFound(name) => write!(f, "identifier not found: {}", name),
-            EvalError::NotCallable(obj) => write!(f, "not a closure or a builtin function: {}", obj.type_name()),
+            EvalError::NotCallable(obj) => write!(
+                f,
+                "not a closure or a builtin function: {}",
+                obj.type_name()
+            ),
             EvalError::WrongArgumentCount { expected, given } => write!(
                 f,
                 "wrong number of arguments: expected {}, given {}",

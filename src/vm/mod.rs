@@ -326,6 +326,9 @@ impl Vm {
                         return Err(VmError::InvalidConstIndex(const_index, len));
                     }
                 }
+                Some(OpCode::GetFree) => {
+                    unimplemented!();
+                }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
                 }

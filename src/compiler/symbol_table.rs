@@ -6,22 +6,28 @@ use std::mem;
 pub enum SymbolScope {
     Global,
     Local,
+    Free,
     Builtin,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Symbol {
-    pub name: String,
     pub scope: SymbolScope,
     pub index: u16,
 }
 
 // TODO: Better naming.
 struct SymbolLayer {
+    // Either of:
+    // - globals & builtins
+    // - locals
     store: HashMap<String, Symbol>,
 
     // Keep track of non-builtin definitions.
     num_definitions: u16,
+
+    // Original symbols of free symbols from the one-level outer scope.
+    pub free_symbols: Vec<Symbol>,
 }
 
 impl SymbolLayer {
@@ -29,7 +35,23 @@ impl SymbolLayer {
         SymbolLayer {
             store: HashMap::new(),
             num_definitions: 0,
+            free_symbols: vec![],
         }
+    }
+
+    pub fn define_free(&mut self, name: &str, original: Symbol) -> Symbol {
+        let symbol = Symbol {
+            index: self.free_symbols.len() as u16,
+            scope: SymbolScope::Free,
+        };
+
+        self.free_symbols.push(original);
+        *self.define_symbol(name, symbol)
+    }
+
+    pub fn define_symbol(&mut self, name: &str, symbol: Symbol) -> &Symbol {
+        self.store.insert(name.to_string(), symbol);
+        self.store.get(name).expect("inserted just now")
     }
 }
 
@@ -63,12 +85,14 @@ impl SymbolTable {
         self.outers.push(outer);
     }
 
-    pub fn pop(&mut self) {
+    pub fn pop(&mut self) -> Vec<Symbol> {
         match self.outers.pop() {
             Some(outer) => {
-                mem::replace(&mut self.current, outer);
+                let popped = mem::replace(&mut self.current, outer);
+                popped.free_symbols
             }
-            None => {}
+            // TODO: Should this throw? Or `Result`?
+            None => vec![],
         }
     }
 
@@ -80,13 +104,12 @@ impl SymbolTable {
             SymbolScope::Local
         };
         let symbol = Symbol {
-            name: name.to_string(),
             index: self.current.num_definitions,
             scope,
         };
         self.current.num_definitions += 1;
 
-        self.define_symbol(name, symbol)
+        self.current.define_symbol(name, symbol)
     }
 
     pub fn define_builtin(&mut self, index: u16, name: &str) -> &Symbol {
@@ -95,33 +118,50 @@ impl SymbolTable {
         }
 
         let symbol = Symbol {
-            name: name.to_string(),
             index,
             scope: SymbolScope::Builtin,
         };
 
-        self.define_symbol(name, symbol)
+        self.current.define_symbol(name, symbol)
     }
 
-    pub fn resolve(&self, name: &str) -> Option<&Symbol> {
-        self.current.store.get(name).or_else(|| {
-            // Try from the 2nd innermost store to the outermost one.
-            for outer in self.outers.iter().rev() {
-                if let Some(symbol) = outer.store.get(name) {
-                    return Some(symbol);
-                }
+    pub fn resolve(&mut self, name: &str) -> Option<Symbol> {
+        {
+            // Silence the borrow checker.
+            // https://users.rust-lang.org/t/solved-borrow-doesnt-drop-returning-this-value-requires-that/24182
+            let maybe_symbol: Option<&Symbol> =
+                unsafe { mem::transmute(self.current.store.get(name)) };
+            if maybe_symbol.is_some() {
+                return maybe_symbol.map(|s| *s);
             }
-            None
-        })
+        }
+
+        let num_outers = self.outers.len();
+        // Try from the 2nd innermost store to the outermost one.
+        for (i, outer) in self.outers.iter().rev().enumerate() {
+            if let Some(original) = outer.store.get(name) {
+                return match original.scope {
+                    SymbolScope::Global | SymbolScope::Builtin => Some(*original),
+                    SymbolScope::Local | SymbolScope::Free => {
+                        // If the symbol doesn't exist in the current scope but exists in an outer
+                        // scope, define it as a free scope in all the scopes between the current scope
+                        // and the original scope.
+                        let mut parent_symbol = *original;
+                        // Propagate the free symbol from outer to inner.
+                        for j in (num_outers - i)..num_outers {
+                            let o = &mut self.outers[j];
+                            parent_symbol = o.define_free(name, parent_symbol);
+                        }
+                        Some(self.current.define_free(name, parent_symbol))
+                    }
+                };
+            }
+        }
+        None
     }
 
     pub fn num_definitions(&self) -> u16 {
         self.current.num_definitions
-    }
-
-    fn define_symbol(&mut self, name: &str, symbol: Symbol) -> &Symbol {
-        self.current.store.insert(name.to_string(), symbol);
-        self.current.store.get(name).expect("inserted just now")
     }
 }
 
@@ -137,7 +177,6 @@ mod tests {
         assert_eq!(
             a,
             &Symbol {
-                name: "a".to_string(),
                 scope: SymbolScope::Global,
                 index: 0
             }
@@ -146,7 +185,6 @@ mod tests {
         assert_eq!(
             b,
             &Symbol {
-                name: "b".to_string(),
                 scope: SymbolScope::Global,
                 index: 1
             }
@@ -158,7 +196,6 @@ mod tests {
         assert_eq!(
             c,
             &Symbol {
-                name: "c".to_string(),
                 scope: SymbolScope::Local,
                 index: 0
             }
@@ -167,7 +204,6 @@ mod tests {
         assert_eq!(
             d,
             &Symbol {
-                name: "d".to_string(),
                 scope: SymbolScope::Local,
                 index: 1
             }
@@ -179,7 +215,6 @@ mod tests {
         assert_eq!(
             e,
             &Symbol {
-                name: "e".to_string(),
                 scope: SymbolScope::Local,
                 index: 0
             }
@@ -188,7 +223,6 @@ mod tests {
         assert_eq!(
             f,
             &Symbol {
-                name: "f".to_string(),
                 scope: SymbolScope::Local,
                 index: 1
             }
@@ -202,18 +236,22 @@ mod tests {
         global.define("b");
 
         test_resolve(
-            &global,
+            &mut global,
             &vec![
-                Symbol {
-                    name: "a".to_string(),
-                    scope: SymbolScope::Global,
-                    index: 0,
-                },
-                Symbol {
-                    name: "b".to_string(),
-                    scope: SymbolScope::Global,
-                    index: 1,
-                },
+                (
+                    "a".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Global,
+                        index: 0,
+                    },
+                ),
+                (
+                    "b".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Global,
+                        index: 1,
+                    },
+                ),
             ],
         );
     }
@@ -229,28 +267,36 @@ mod tests {
         table.define("d");
 
         test_resolve(
-            &table,
+            &mut table,
             &vec![
-                Symbol {
-                    name: "a".to_string(),
-                    scope: SymbolScope::Global,
-                    index: 0,
-                },
-                Symbol {
-                    name: "b".to_string(),
-                    scope: SymbolScope::Global,
-                    index: 1,
-                },
-                Symbol {
-                    name: "c".to_string(),
-                    scope: SymbolScope::Local,
-                    index: 0,
-                },
-                Symbol {
-                    name: "d".to_string(),
-                    scope: SymbolScope::Local,
-                    index: 1,
-                },
+                (
+                    "a".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Global,
+                        index: 0,
+                    },
+                ),
+                (
+                    "b".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Global,
+                        index: 1,
+                    },
+                ),
+                (
+                    "c".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Local,
+                        index: 0,
+                    },
+                ),
+                (
+                    "d".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Local,
+                        index: 1,
+                    },
+                ),
             ],
         );
     }
@@ -266,28 +312,36 @@ mod tests {
         table.define("d");
 
         test_resolve(
-            &table,
+            &mut table,
             &vec![
-                Symbol {
-                    name: "a".to_string(),
-                    scope: SymbolScope::Global,
-                    index: 0,
-                },
-                Symbol {
-                    name: "b".to_string(),
-                    scope: SymbolScope::Global,
-                    index: 1,
-                },
-                Symbol {
-                    name: "c".to_string(),
-                    scope: SymbolScope::Local,
-                    index: 0,
-                },
-                Symbol {
-                    name: "d".to_string(),
-                    scope: SymbolScope::Local,
-                    index: 1,
-                },
+                (
+                    "a".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Global,
+                        index: 0,
+                    },
+                ),
+                (
+                    "b".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Global,
+                        index: 1,
+                    },
+                ),
+                (
+                    "c".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Local,
+                        index: 0,
+                    },
+                ),
+                (
+                    "d".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Local,
+                        index: 1,
+                    },
+                ),
             ],
         );
 
@@ -296,28 +350,36 @@ mod tests {
         table.define("f");
 
         test_resolve(
-            &table,
+            &mut table,
             &vec![
-                Symbol {
-                    name: "a".to_string(),
-                    scope: SymbolScope::Global,
-                    index: 0,
-                },
-                Symbol {
-                    name: "b".to_string(),
-                    scope: SymbolScope::Global,
-                    index: 1,
-                },
-                Symbol {
-                    name: "e".to_string(),
-                    scope: SymbolScope::Local,
-                    index: 0,
-                },
-                Symbol {
-                    name: "f".to_string(),
-                    scope: SymbolScope::Local,
-                    index: 1,
-                },
+                (
+                    "a".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Global,
+                        index: 0,
+                    },
+                ),
+                (
+                    "b".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Global,
+                        index: 1,
+                    },
+                ),
+                (
+                    "e".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Local,
+                        index: 0,
+                    },
+                ),
+                (
+                    "f".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Local,
+                        index: 1,
+                    },
+                ),
             ],
         );
     }
@@ -329,33 +391,209 @@ mod tests {
         table.define_builtin(1, "b");
 
         let tests = vec![
-            Symbol {
-                name: "a".to_string(),
-                scope: SymbolScope::Builtin,
-                index: 0,
-            },
-            Symbol {
-                name: "b".to_string(),
-                scope: SymbolScope::Builtin,
-                index: 1,
-            },
+            (
+                "a".to_string(),
+                Symbol {
+                    scope: SymbolScope::Builtin,
+                    index: 0,
+                },
+            ),
+            (
+                "b".to_string(),
+                Symbol {
+                    scope: SymbolScope::Builtin,
+                    index: 1,
+                },
+            ),
         ];
 
-        test_resolve(&table, &tests);
+        test_resolve(&mut table, &tests);
 
         table.push();
-        test_resolve(&table, &tests);
+        test_resolve(&mut table, &tests);
 
         table.push();
-        test_resolve(&table, &tests);
+        test_resolve(&mut table, &tests);
     }
 
-    fn test_resolve(table: &SymbolTable, expected: &Vec<Symbol>) {
-        for symbol in expected {
+    #[test]
+    fn resolve_free() {
+        let mut table = SymbolTable::new();
+        table.define("a");
+        table.define("b");
+
+        table.push();
+        table.define("c");
+        table.define("d");
+
+        test_resolve(
+            &mut table,
+            &vec![
+                (
+                    "a".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Global,
+                        index: 0,
+                    },
+                ),
+                (
+                    "b".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Global,
+                        index: 1,
+                    },
+                ),
+                (
+                    "c".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Local,
+                        index: 0,
+                    },
+                ),
+                (
+                    "d".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Local,
+                        index: 1,
+                    },
+                ),
+            ],
+        );
+
+        table.push();
+        table.define("e");
+        table.define("f");
+
+        test_resolve(
+            &mut table,
+            &vec![
+                (
+                    "a".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Global,
+                        index: 0,
+                    },
+                ),
+                (
+                    "b".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Global,
+                        index: 1,
+                    },
+                ),
+                (
+                    "c".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Free,
+                        index: 0,
+                    },
+                ),
+                (
+                    "d".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Free,
+                        index: 1,
+                    },
+                ),
+                (
+                    "e".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Local,
+                        index: 0,
+                    },
+                ),
+                (
+                    "f".to_string(),
+                    Symbol {
+                        scope: SymbolScope::Local,
+                        index: 1,
+                    },
+                ),
+            ],
+        );
+        test_unresolvable(&mut table, &vec!["foo", "z"]);
+    }
+
+    #[test]
+    fn nested_resolve_global() {
+        let mut table = SymbolTable::new();
+        table.define("a");
+        table.push();
+        table.push();
+
+        let symbol = table.resolve("a").expect("expected \"a\" to be resolved");
+        assert_eq!(symbol.index, 0);
+        assert_eq!(symbol.scope, SymbolScope::Global);
+    }
+
+    #[test]
+    fn nested_resolve_free_local() {
+        let mut table = SymbolTable::new();
+        table.push();
+        table.define("a");
+        table.push();
+
+        let symbol = table.resolve("a").expect("expected \"a\" to be resolved");
+        assert_eq!(symbol.index, 0);
+        assert_eq!(symbol.scope, SymbolScope::Free);
+
+        assert_eq!(
+            table.pop(),
+            vec![Symbol {
+                scope: SymbolScope::Local,
+                index: 0
+            }]
+        );
+    }
+
+    #[test]
+    fn nested_resolve_free_symbols() {
+        let mut table = SymbolTable::new();
+        table.push();
+        table.define("a");
+        table.push();
+        table.push();
+        table.push();
+        let symbol = table.resolve("a").expect("expected \"a\" to be resolved");
+        assert_eq!(symbol.index, 0);
+        assert_eq!(symbol.scope, SymbolScope::Free);
+
+        assert_eq!(
+            table.pop(),
+            vec![Symbol {
+                scope: SymbolScope::Free,
+                index: 0
+            }]
+        );
+        assert_eq!(
+            table.pop(),
+            vec![Symbol {
+                scope: SymbolScope::Free,
+                index: 0
+            }]
+        );
+        assert_eq!(
+            table.pop(),
+            vec![Symbol {
+                scope: SymbolScope::Local,
+                index: 0
+            }]
+        );
+        assert_eq!(table.pop(), vec![]);
+    }
+
+    fn test_resolve(table: &mut SymbolTable, expected: &[(String, Symbol)]) {
+        for (name, symbol) in expected {
             let resolved = table
-                .resolve(&symbol.name)
-                .expect(&format!("expected `{}` to be resolved", symbol.name));
-            assert_eq!(resolved, symbol);
+                .resolve(&name)
+                .expect(&format!("expected `{}` to be resolved", name));
+            assert_eq!(&resolved, symbol);
+        }
+    }
+
+    fn test_unresolvable(table: &mut SymbolTable, expected: &Vec<&str>) {
+        for name in expected {
+            assert_eq!(table.resolve(name), None);
         }
     }
 }
