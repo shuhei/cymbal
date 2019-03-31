@@ -59,18 +59,14 @@ impl Compiler {
             Statement::Let(name, exp) => {
                 self.compile_expression(exp)?;
 
-                let (symbol_index, scope) = {
-                    let mut table = self.symbol_table.borrow_mut();
-                    let symbol = table.define(name);
-                    (symbol.index, symbol.scope)
-                };
+                let symbol = *self.symbol_table.borrow_mut().define(name);
 
-                match scope {
+                match symbol.scope {
                     SymbolScope::Global => {
-                        self.emit_with_operands(OpCode::SetGlobal, OpCode::u16(symbol_index));
+                        self.emit_with_operands(OpCode::SetGlobal, OpCode::u16(symbol.index));
                     }
                     SymbolScope::Local => {
-                        self.emit_with_operands(OpCode::SetLocal, vec![symbol_index as u8]);
+                        self.emit_with_operands(OpCode::SetLocal, vec![symbol.index as u8]);
                     }
                     SymbolScope::Free => {
                         panic!("free cannot be defined by let statement");
@@ -220,13 +216,13 @@ impl Compiler {
                 );
             }
             Expression::Identifier(name) => {
-                let (symbol_index, scope) = {
+                let symbol = {
                     match self.symbol_table.borrow_mut().resolve(name) {
-                        Some(symbol) => (symbol.index, symbol.scope),
+                        Some(symbol) => symbol,
                         None => return Err(CompileError::UndefinedVariable(name.to_string())),
                     }
                 };
-                self.load_symbol(scope, symbol_index);
+                self.load_symbol(symbol);
             }
             Expression::Array(exps) => {
                 for exp in exps {
@@ -280,13 +276,15 @@ impl Compiler {
 
                 // TODO: Check too many local bindings.
                 let num_locals = self.symbol_table.borrow().num_definitions() as u8;
-                // TODO: Check too many free variables.
                 let (instructions, free_symbols) = self.leave_scope();
+
+                // TODO: Check too many free variables.
+                let num_frees = free_symbols.len() as u8;
 
                 // Load free variables before the OpCode::Closure so that the VM can build a closure
                 // with free variables.
-                for free in &free_symbols {
-                    self.load_symbol(free.scope, free.index);
+                for free in free_symbols {
+                    self.load_symbol(free);
                 }
 
                 let compiled_function = Rc::new(Object::CompiledFunction(CompiledFunction {
@@ -298,7 +296,7 @@ impl Compiler {
                 let const_index = self.add_constant(compiled_function);
                 self.emit_with_operands(
                     OpCode::Closure,
-                    OpCode::u16_u8(const_index, free_symbols.len() as u8),
+                    OpCode::u16_u8(const_index, num_frees),
                 );
             }
             Expression::Call(func, args) => {
@@ -376,19 +374,19 @@ impl Compiler {
         self.scopes[self.scope_index].replace_last_pop_with_return()
     }
 
-    fn load_symbol(&mut self, scope: SymbolScope, symbol_index: u16) {
-        match scope {
+    fn load_symbol(&mut self, symbol: Symbol) {
+        match symbol.scope {
             SymbolScope::Builtin => {
-                self.emit_with_operands(OpCode::GetBuiltin, vec![symbol_index as u8]);
+                self.emit_with_operands(OpCode::GetBuiltin, vec![symbol.index as u8]);
             }
             SymbolScope::Global => {
-                self.emit_with_operands(OpCode::GetGlobal, OpCode::u16(symbol_index));
+                self.emit_with_operands(OpCode::GetGlobal, OpCode::u16(symbol.index));
             }
             SymbolScope::Free => {
-                self.emit_with_operands(OpCode::GetFree, vec![symbol_index as u8]);
+                self.emit_with_operands(OpCode::GetFree, vec![symbol.index as u8]);
             }
             SymbolScope::Local => {
-                self.emit_with_operands(OpCode::GetLocal, vec![symbol_index as u8]);
+                self.emit_with_operands(OpCode::GetLocal, vec![symbol.index as u8]);
             }
         }
     }
