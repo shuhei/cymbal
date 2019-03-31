@@ -1,5 +1,6 @@
 use crate::code::Instructions;
-use crate::object::Closure;
+use crate::object::{Closure, Object};
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct Frame {
@@ -19,5 +20,9 @@ impl Frame {
 
     pub fn instructions(&self) -> &Instructions {
         &self.closure.func.instructions
+    }
+
+    pub fn free_at(&self, index: usize) -> Rc<Object> {
+        Rc::clone(&self.closure.free[index])
     }
 }

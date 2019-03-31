@@ -55,7 +55,7 @@ impl fmt::Display for Object {
                 f,
                 "closure ({}) ({}): {}",
                 closure.func.num_locals,
-                print_objects(&closure.free),
+                print_objects(&closure.free.iter().map(|o| (**o).clone()).collect()),
                 code::print_instructions(&closure.func.instructions),
             ),
         }
@@ -147,7 +147,7 @@ impl fmt::Display for CompiledFunction {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Closure {
     pub func: CompiledFunction,
-    pub free: Vec<Object>,
+    pub free: Vec<Rc<Object>>,
 }
 
 pub enum EvalError {

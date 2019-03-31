@@ -187,11 +187,11 @@ impl Vm {
                     self.increment_ip(2);
 
                     let mut items = Vec::with_capacity(size);
-                    for i in 0..size {
+                    for _ in 0..size {
                         // TODO: Don't clone an object from Rc!
-                        items.push((*self.stack[self.sp - size + i]).clone());
+                        items.push((*self.pop()?).clone());
                     }
-                    self.sp -= size;
+                    items.reverse();
 
                     self.push(Rc::new(Object::Array(items)))?;
                 }
@@ -200,15 +200,13 @@ impl Vm {
                     self.increment_ip(2);
 
                     let mut items = HashMap::with_capacity(size);
-                    for i in 0..size {
-                        let index = self.sp - size * 2 + i * 2;
-                        let key = HashKey::from_object(&self.stack[index])
-                            .or_else(|e| Err(VmError::Eval(e)))?;
+                    for _ in 0..size {
                         // TODO: Don't clone an object from Rc!
-                        let value = (*self.stack[index + 1]).clone();
+                        let value = (*self.pop()?).clone();
+                        let key = HashKey::from_object(&*self.pop()?)
+                            .or_else(|e| Err(VmError::Eval(e)))?;
                         items.insert(key, value);
                     }
-                    self.sp -= size * 2;
 
                     self.push(Rc::new(Object::Hash(items)))?;
                 }
@@ -306,7 +304,7 @@ impl Vm {
                 }
                 Some(OpCode::Closure) => {
                     let const_index = code::read_uint16(ins, ip + 1) as usize;
-                    let _free_count = ins[ip + 3] as usize;
+                    let num_frees = ins[ip + 3] as usize;
                     self.increment_ip(3);
 
                     let len = self.constants.borrow().len();
@@ -314,10 +312,13 @@ impl Vm {
                         let constant = { Rc::clone(&self.constants.borrow()[const_index]) };
                         // TODO: Don't clone Rc!
                         if let Object::CompiledFunction(cf) = (*constant).clone() {
-                            let closure = Closure {
-                                func: cf,
-                                free: vec![],
-                            };
+                            let mut free = Vec::with_capacity(num_frees);
+                            for _ in 0..num_frees {
+                                free.push(Rc::clone(&self.pop()?));
+                            }
+                            free.reverse();
+
+                            let closure = Closure { func: cf, free };
                             self.push(Rc::new(Object::Closure(closure)))?;
                         } else {
                             return Err(VmError::NotFunction(Rc::clone(&constant)));
@@ -327,7 +328,11 @@ impl Vm {
                     }
                 }
                 Some(OpCode::GetFree) => {
-                    unimplemented!();
+                    let free_index = ins[ip + 1] as usize;
+                    self.increment_ip(1);
+
+                    let free = self.current_frame().free_at(free_index);
+                    self.push(free)?;
                 }
                 None => {
                     return Err(VmError::UnknownOpCode(op_code_byte));
@@ -883,6 +888,18 @@ mod tests {
                 "unsupported arguments to `push`: INTEGER, INTEGER",
             ),
         ]);
+    }
+
+    #[test]
+    fn closures() {
+        expect_values(vec![(
+            "let newClosure = fn(a) {
+                 fn() { a; };
+             };
+             let closure = newClosure(99);
+             closure();",
+            "99",
+        )]);
     }
 
     fn expect_values(tests: Vec<(&str, &str)>) {
