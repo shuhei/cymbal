@@ -479,6 +479,7 @@ impl CompilationScope {
     }
 }
 
+#[derive(Debug)]
 pub enum CompileError {
     UnknownOperator(Infix),
     UndefinedVariable(String),

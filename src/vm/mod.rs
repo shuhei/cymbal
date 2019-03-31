@@ -568,6 +568,7 @@ fn infix_from_op_code(op_code: OpCode) -> Option<Infix> {
     }
 }
 
+#[derive(Debug)]
 pub enum VmError {
     UnknownOpCode(u8),
     InvalidConstIndex(usize, usize),

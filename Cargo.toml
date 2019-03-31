@@ -1,7 +1,18 @@
+cargo-features = ["default-run"]
+
 [package]
 name = "cymbal"
 version = "0.1.0"
 authors = ["Shuhei Kagawa <shuhei.kagawa@gmail.com>"]
 edition = "2018"
+default-run = "repl"
 
 [dependencies]
+
+[[bin]]
+name = "repl"
+path = "src/main.rs"
+
+[[bin]]
+name = "benchmark"
+path = "src/benchmark.rs"

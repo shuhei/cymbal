@@ -150,6 +150,7 @@ pub struct Closure {
     pub free: Vec<Rc<Object>>,
 }
 
+#[derive(Debug)]
 pub enum EvalError {
     TypeMismatch(Infix, Object, Object),
     UnknownPrefixOperator(Prefix, Object),

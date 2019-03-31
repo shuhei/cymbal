@@ -28,6 +28,13 @@ Test:
 cargo test
 ```
 
+Benchmark with recursive fibonacci:
+
+```sh
+cargo run --release --bin benchmark -- --eval
+cargo run --release --bin benchmark -- --compile
+```
+
 ## License
 
 MIT

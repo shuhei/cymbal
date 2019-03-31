@@ -1,6 +1,7 @@
 use crate::compiler::{Compiler, SymbolTable};
 use crate::evaluator;
 use crate::lexer::Lexer;
+use crate::mode::Mode;
 use crate::object::Environment;
 use crate::parser::Parser;
 use crate::vm;
@@ -9,11 +10,6 @@ use std::cell::RefCell;
 use std::io;
 use std::io::Write;
 use std::rc::Rc;
-
-pub enum Mode {
-    Eval,
-    Compile,
-}
 
 pub fn start(mode: Mode) {
     let mut stdout = io::stdout();
