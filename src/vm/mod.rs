@@ -956,6 +956,25 @@ mod tests {
         ]);
     }
 
+    #[test]
+    fn recursive_fibonacci() {
+        expect_values(vec![(
+            "let fibonacci = fn(x) {
+                 if (x == 0) {
+                     0
+                 } else {
+                     if (x == 1) {
+                         1
+                     } else {
+                         fibonacci(x - 1) + fibonacci(x - 2)
+                     }
+                 }
+             };
+             fibonacci(15);",
+            "610",
+        )]);
+    }
+
     fn expect_values(tests: Vec<(&str, &str)>) {
         for (input, expected) in tests {
             let mut vm = make_vm(input);

@@ -57,9 +57,11 @@ impl Compiler {
                 self.emit(OpCode::Pop);
             }
             Statement::Let(name, exp) => {
-                self.compile_expression(exp)?;
-
+                // Define the symbol first so that recursive functions can reference themselves in
+                // their function bodies.
                 let symbol = *self.symbol_table.borrow_mut().define(name);
+
+                self.compile_expression(exp)?;
 
                 match symbol.scope {
                     SymbolScope::Global => {
