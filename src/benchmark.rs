@@ -23,7 +23,7 @@ pub fn run(mode: Mode) {
                  }
              }
          };
-         fibonacci(25);";
+         fibonacci(35);";
 
     let lexer = Lexer::new(code);
     let mut parser = Parser::new(lexer);
