@@ -260,6 +260,11 @@ impl Compiler {
                 self.emit(OpCode::Index);
             }
             Expression::FunctionLiteral(params, body) => {
+                let num_params = params.len();
+                if num_params > 0xff {
+                    return Err(CompileError::TooManyParams);
+                }
+
                 self.enter_scope();
 
                 for param in params {
@@ -276,12 +281,16 @@ impl Compiler {
                     self.emit(OpCode::Return);
                 }
 
-                // TODO: Check too many local bindings.
-                let num_locals = self.symbol_table.borrow().num_definitions() as u8;
+                let num_locals = self.symbol_table.borrow().num_definitions();
+                if num_locals > 0xff {
+                    return Err(CompileError::TooManyLocals);
+                }
                 let (instructions, free_symbols) = self.leave_scope();
 
-                // TODO: Check too many free variables.
-                let num_frees = free_symbols.len() as u8;
+                let num_frees = free_symbols.len();
+                if num_frees > 0xff {
+                    return Err(CompileError::TooManyFrees);
+                }
 
                 // Load free variables before the OpCode::Closure so that the VM can build a closure
                 // with free variables.
@@ -291,14 +300,13 @@ impl Compiler {
 
                 let compiled_function = Rc::new(Object::CompiledFunction(CompiledFunction {
                     instructions,
-                    num_locals,
-                    // TODO: Check too many parameters
-                    num_parameters: params.len() as u8,
+                    num_locals: num_locals as u8,
+                    num_parameters: num_params as u8,
                 }));
                 let const_index = self.add_constant(compiled_function);
                 self.emit_with_operands(
                     OpCode::Closure,
-                    OpCode::u16_u8(const_index, num_frees),
+                    OpCode::u16_u8(const_index, num_frees as u8),
                 );
             }
             Expression::Call(func, args) => {
@@ -483,6 +491,9 @@ impl CompilationScope {
 pub enum CompileError {
     UnknownOperator(Infix),
     UndefinedVariable(String),
+    TooManyParams,
+    TooManyLocals,
+    TooManyFrees,
 }
 
 impl fmt::Display for CompileError {
@@ -490,6 +501,9 @@ impl fmt::Display for CompileError {
         match self {
             CompileError::UnknownOperator(infix) => write!(f, "unknown operator: {}", infix),
             CompileError::UndefinedVariable(name) => write!(f, "undefined variable: {}", name),
+            CompileError::TooManyParams => write!(f, "too many parameters for a function"),
+            CompileError::TooManyLocals => write!(f, "too many local bindings in a function"),
+            CompileError::TooManyFrees => write!(f, "too many free bindings in a function"),
         }
     }
 }
