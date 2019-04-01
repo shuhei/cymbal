@@ -142,7 +142,7 @@ impl Compiler {
             }
             Expression::IntegerLiteral(value) => {
                 let constant = Rc::new(Object::Integer(*value));
-                let const_index = self.add_constant(constant);
+                let const_index = self.add_constant(constant)?;
                 self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
             }
             Expression::Boolean(true) => {
@@ -153,7 +153,7 @@ impl Compiler {
             }
             Expression::StringLiteral(value) => {
                 let constant = Rc::new(Object::String(value.clone()));
-                let const_index = self.add_constant(constant);
+                let const_index = self.add_constant(constant)?;
                 self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
             }
             // if (condition) { consequence }
@@ -303,7 +303,7 @@ impl Compiler {
                     num_locals: num_locals as u8,
                     num_parameters: num_params as u8,
                 }));
-                let const_index = self.add_constant(compiled_function);
+                let const_index = self.add_constant(compiled_function)?;
                 self.emit_with_operands(
                     OpCode::Closure,
                     OpCode::u16_u8(const_index, num_frees as u8),
@@ -347,10 +347,13 @@ impl Compiler {
         (scope.instructions, free_symbols)
     }
 
-    fn add_constant(&mut self, constant: Rc<Object>) -> u16 {
+    fn add_constant(&mut self, constant: Rc<Object>) -> Result<u16, CompileError> {
+        let constant_index = self.constants.borrow().len();
+        if constant_index >= 0xffff {
+            return Err(CompileError::TooManyConstants);
+        }
         self.constants.borrow_mut().push(constant);
-        // TODO: Check the limit
-        (self.constants.borrow().len() - 1) as u16
+        Ok(constant_index as u16)
     }
 
     fn emit(&mut self, op_code: OpCode) -> usize {
@@ -491,6 +494,7 @@ impl CompilationScope {
 pub enum CompileError {
     UnknownOperator(Infix),
     UndefinedVariable(String),
+    TooManyConstants,
     TooManyParams,
     TooManyLocals,
     TooManyFrees,
@@ -501,6 +505,7 @@ impl fmt::Display for CompileError {
         match self {
             CompileError::UnknownOperator(infix) => write!(f, "unknown operator: {}", infix),
             CompileError::UndefinedVariable(name) => write!(f, "undefined variable: {}", name),
+            CompileError::TooManyConstants => write!(f, "too many constants"),
             CompileError::TooManyParams => write!(f, "too many parameters for a function"),
             CompileError::TooManyLocals => write!(f, "too many local bindings in a function"),
             CompileError::TooManyFrees => write!(f, "too many free bindings in a function"),
@@ -1157,7 +1162,6 @@ mod tests {
                         1,
                         1,
                         vec![
-                            // TODO: This is resolved as a local. Why?
                             make_u8(OpCode::GetFree, 0),
                             make_u8(OpCode::GetLocal, 0),
                             make_u16_u8(OpCode::Closure, 0, 2),
