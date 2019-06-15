@@ -11,9 +11,11 @@ Start REPL:
 ```sh
 # Run in eval mode to directly evaluate AST
 cargo run
+# or
+cargo run -- --eval
 
 # Run in compile mode to compile AST into bytecode and execute it on VM
-cargo run --compile
+cargo run -- --compile
 ```
 
 Build:

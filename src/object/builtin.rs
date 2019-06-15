@@ -23,6 +23,7 @@ pub const BUILTINS: &'static [Builtin] = &[
     builtin!(rest),
     builtin!(push),
     builtin!(puts),
+    builtin!(exit),
 ];
 
 pub fn lookup(name: &str) -> Option<Object> {
@@ -119,4 +120,8 @@ fn puts(arguments: Vec<Object>) -> EvalResult {
         println!("{}", arg);
     }
     Ok(Object::Null)
+}
+
+fn exit(_arguments: Vec<Object>) -> EvalResult {
+    std::process::exit(0);
 }
