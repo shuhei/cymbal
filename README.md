@@ -31,8 +31,8 @@ cargo test
 Benchmark with recursive fibonacci:
 
 ```sh
-cargo run --release -- --benchmark -- --eval
-cargo run --release -- --benchmark -- --compile
+cargo run --release -- --benchmark --eval
+cargo run --release -- --benchmark --compile
 ```
 
 ## License
