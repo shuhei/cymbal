@@ -289,11 +289,11 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
         OpCode::GetFree => Definition {
             name: "OpGetFree".to_string(),
             widths: vec![1],
-        }
+        },
     })
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Constant {
     Integer(i64),
     String(String),

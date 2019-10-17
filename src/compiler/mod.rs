@@ -526,7 +526,6 @@ mod tests {
         Instructions, OpCode,
     };
     use crate::lexer::Lexer;
-    use crate::object::Object;
     use crate::parser::Parser;
     use std::borrow::Borrow;
 
@@ -535,7 +534,7 @@ mod tests {
         test_compile(vec![
             (
                 "1 + 2",
-                vec![Object::Integer(1), Object::Integer(2)],
+                vec![Constant::Integer(1), Constant::Integer(2)],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::Constant, 1),
@@ -545,7 +544,7 @@ mod tests {
             ),
             (
                 "1 - 2",
-                vec![Object::Integer(1), Object::Integer(2)],
+                vec![Constant::Integer(1), Constant::Integer(2)],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::Constant, 1),
@@ -555,7 +554,7 @@ mod tests {
             ),
             (
                 "1 * 2",
-                vec![Object::Integer(1), Object::Integer(2)],
+                vec![Constant::Integer(1), Constant::Integer(2)],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::Constant, 1),
@@ -565,7 +564,7 @@ mod tests {
             ),
             (
                 "2 / 1",
-                vec![Object::Integer(2), Object::Integer(1)],
+                vec![Constant::Integer(2), Constant::Integer(1)],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::Constant, 1),
@@ -581,7 +580,7 @@ mod tests {
             ),
             (
                 "1 == 2",
-                vec![Object::Integer(1), Object::Integer(2)],
+                vec![Constant::Integer(1), Constant::Integer(2)],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::Constant, 1),
@@ -591,7 +590,7 @@ mod tests {
             ),
             (
                 "1 != 2",
-                vec![Object::Integer(1), Object::Integer(2)],
+                vec![Constant::Integer(1), Constant::Integer(2)],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::Constant, 1),
@@ -601,7 +600,7 @@ mod tests {
             ),
             (
                 "1 > 2",
-                vec![Object::Integer(1), Object::Integer(2)],
+                vec![Constant::Integer(1), Constant::Integer(2)],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::Constant, 1),
@@ -611,7 +610,7 @@ mod tests {
             ),
             (
                 "1 < 2",
-                vec![Object::Integer(2), Object::Integer(1)],
+                vec![Constant::Integer(2), Constant::Integer(1)],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::Constant, 1),
@@ -632,7 +631,7 @@ mod tests {
             ),
             (
                 "-123",
-                vec![Object::Integer(123)],
+                vec![Constant::Integer(123)],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make(OpCode::Minus),
@@ -647,7 +646,7 @@ mod tests {
         test_compile(vec![
             (
                 "if (true) { 10 }; 3333;",
-                vec![Object::Integer(10), Object::Integer(3333)],
+                vec![Constant::Integer(10), Constant::Integer(3333)],
                 vec![
                     make(OpCode::True),
                     make_u16(OpCode::JumpIfNotTruthy, 10),
@@ -662,9 +661,9 @@ mod tests {
             (
                 "if (true) { 10 } else { 20 }; 3333;",
                 vec![
-                    Object::Integer(10),
-                    Object::Integer(20),
-                    Object::Integer(3333),
+                    Constant::Integer(10),
+                    Constant::Integer(20),
+                    Constant::Integer(3333),
                 ],
                 vec![
                     make(OpCode::True),
@@ -685,7 +684,7 @@ mod tests {
         test_compile(vec![
             (
                 "let one = 1; let two = 2;",
-                vec![Object::Integer(1), Object::Integer(2)],
+                vec![Constant::Integer(1), Constant::Integer(2)],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::SetGlobal, 0),
@@ -695,7 +694,7 @@ mod tests {
             ),
             (
                 "let one = 1; one;",
-                vec![Object::Integer(1)],
+                vec![Constant::Integer(1)],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::SetGlobal, 0),
@@ -705,7 +704,7 @@ mod tests {
             ),
             (
                 "let one = 1; let two = one; two;",
-                vec![Object::Integer(1)],
+                vec![Constant::Integer(1)],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::SetGlobal, 0),
@@ -723,14 +722,14 @@ mod tests {
         test_compile(vec![
             (
                 r#""hello""#,
-                vec![Object::String("hello".to_string())],
+                vec![Constant::String("hello".to_string())],
                 vec![make_u16(OpCode::Constant, 0), make(OpCode::Pop)],
             ),
             (
                 r#""hel" + "lo""#,
                 vec![
-                    Object::String("hel".to_string()),
-                    Object::String("lo".to_string()),
+                    Constant::String("hel".to_string()),
+                    Constant::String("lo".to_string()),
                 ],
                 vec![
                     make_u16(OpCode::Constant, 0),
@@ -752,7 +751,11 @@ mod tests {
             ),
             (
                 "[1, 2, 3]",
-                vec![Object::Integer(1), Object::Integer(2), Object::Integer(3)],
+                vec![
+                    Constant::Integer(1),
+                    Constant::Integer(2),
+                    Constant::Integer(3),
+                ],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::Constant, 1),
@@ -764,12 +767,12 @@ mod tests {
             (
                 "[1 - 2, 3 + 4, 5 * 6]",
                 vec![
-                    Object::Integer(1),
-                    Object::Integer(2),
-                    Object::Integer(3),
-                    Object::Integer(4),
-                    Object::Integer(5),
-                    Object::Integer(6),
+                    Constant::Integer(1),
+                    Constant::Integer(2),
+                    Constant::Integer(3),
+                    Constant::Integer(4),
+                    Constant::Integer(5),
+                    Constant::Integer(6),
                 ],
                 vec![
                     make_u16(OpCode::Constant, 0),
@@ -799,11 +802,11 @@ mod tests {
             (
                 r#"{ 1: "hello", "foo": 1 + 2 }"#,
                 vec![
-                    Object::String("foo".to_string()),
-                    Object::Integer(1),
-                    Object::Integer(2),
-                    Object::Integer(1),
-                    Object::String("hello".to_string()),
+                    Constant::String("foo".to_string()),
+                    Constant::Integer(1),
+                    Constant::Integer(2),
+                    Constant::Integer(1),
+                    Constant::String("hello".to_string()),
                 ],
                 vec![
                     make_u16(OpCode::Constant, 0),
@@ -824,7 +827,11 @@ mod tests {
         test_compile(vec![
             (
                 "[1, 2][0]",
-                vec![Object::Integer(1), Object::Integer(2), Object::Integer(0)],
+                vec![
+                    Constant::Integer(1),
+                    Constant::Integer(2),
+                    Constant::Integer(0),
+                ],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::Constant, 1),
@@ -837,13 +844,13 @@ mod tests {
             (
                 r#"{"foo": 1 + 2, "bar": 3 + 4}["bar"]"#,
                 vec![
-                    Object::String("bar".to_string()),
-                    Object::Integer(3),
-                    Object::Integer(4),
-                    Object::String("foo".to_string()),
-                    Object::Integer(1),
-                    Object::Integer(2),
-                    Object::String("bar".to_string()),
+                    Constant::String("bar".to_string()),
+                    Constant::Integer(3),
+                    Constant::Integer(4),
+                    Constant::String("foo".to_string()),
+                    Constant::Integer(1),
+                    Constant::Integer(2),
+                    Constant::String("bar".to_string()),
                 ],
                 vec![
                     make_u16(OpCode::Constant, 0),
@@ -869,8 +876,8 @@ mod tests {
             (
                 "fn() { return 5 + 10 }",
                 vec![
-                    Object::Integer(5),
-                    Object::Integer(10),
+                    Constant::Integer(5),
+                    Constant::Integer(10),
                     compiled_function(
                         0,
                         0,
@@ -887,8 +894,8 @@ mod tests {
             (
                 "fn() { 5 + 10 }",
                 vec![
-                    Object::Integer(5),
-                    Object::Integer(10),
+                    Constant::Integer(5),
+                    Constant::Integer(10),
                     compiled_function(
                         0,
                         0,
@@ -905,8 +912,8 @@ mod tests {
             (
                 "fn() { 1; 2 }",
                 vec![
-                    Object::Integer(1),
-                    Object::Integer(2),
+                    Constant::Integer(1),
+                    Constant::Integer(2),
                     compiled_function(
                         0,
                         0,
@@ -934,7 +941,7 @@ mod tests {
             (
                 "fn() { 24 }();",
                 vec![
-                    Object::Integer(24),
+                    Constant::Integer(24),
                     compiled_function(
                         0,
                         0,
@@ -950,7 +957,7 @@ mod tests {
             (
                 "let noArg = fn() { 24 }; noArg();",
                 vec![
-                    Object::Integer(24),
+                    Constant::Integer(24),
                     compiled_function(
                         0,
                         0,
@@ -973,7 +980,7 @@ mod tests {
                         1,
                         vec![make_u8(OpCode::GetLocal, 0), make(OpCode::ReturnValue)],
                     ),
-                    Object::Integer(24),
+                    Constant::Integer(24),
                 ],
                 vec![
                     make_u16_u8(OpCode::Closure, 0, 0),
@@ -999,9 +1006,9 @@ mod tests {
                             make(OpCode::ReturnValue),
                         ],
                     ),
-                    Object::Integer(24),
-                    Object::Integer(25),
-                    Object::Integer(26),
+                    Constant::Integer(24),
+                    Constant::Integer(25),
+                    Constant::Integer(26),
                 ],
                 vec![
                     make_u16_u8(OpCode::Closure, 0, 0),
@@ -1023,7 +1030,7 @@ mod tests {
             (
                 "let num = 55; fn() { num }",
                 vec![
-                    Object::Integer(55),
+                    Constant::Integer(55),
                     compiled_function(
                         0,
                         0,
@@ -1039,7 +1046,7 @@ mod tests {
             ),
             (
                 "let num = 55; num",
-                vec![Object::Integer(55)],
+                vec![Constant::Integer(55)],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::SetGlobal, 0),
@@ -1054,8 +1061,8 @@ mod tests {
                      a + b
                  }",
                 vec![
-                    Object::Integer(55),
-                    Object::Integer(77),
+                    Constant::Integer(55),
+                    Constant::Integer(77),
                     compiled_function(
                         2,
                         0,
@@ -1081,7 +1088,7 @@ mod tests {
         test_compile(vec![
             (
                 "len([]); push([], 1);",
-                vec![Object::Integer(1)],
+                vec![Constant::Integer(1)],
                 vec![
                     make_u8(OpCode::GetBuiltin, 0),
                     make_u16(OpCode::Array, 0),
@@ -1097,7 +1104,7 @@ mod tests {
             (
                 "fn() { len([], 1); }",
                 vec![
-                    Object::Integer(1),
+                    Constant::Integer(1),
                     compiled_function(
                         0,
                         0,
@@ -1193,10 +1200,10 @@ mod tests {
                      }
                  }",
                 vec![
-                    Object::Integer(55),
-                    Object::Integer(66),
-                    Object::Integer(77),
-                    Object::Integer(88),
+                    Constant::Integer(55),
+                    Constant::Integer(66),
+                    Constant::Integer(77),
+                    Constant::Integer(88),
                     compiled_function(
                         1,
                         0,
@@ -1247,7 +1254,7 @@ mod tests {
         ]);
     }
 
-    fn test_compile(tests: Vec<(&str, Vec<Object>, Vec<Instructions>)>) {
+    fn test_compile(tests: Vec<(&str, Vec<Constant>, Vec<Instructions>)>) {
         for (input, expected_constants, expected_instructions) in tests {
             let program = parse(input);
 
@@ -1274,7 +1281,7 @@ mod tests {
                     let con: &Constant = (*c).borrow();
                     con.clone()
                 })
-                .collect::<Vec<Object>>();
+                .collect::<Vec<Constant>>();
             if constants.len() != expected_constants.len() {
                 assert_eq!(constants, expected_constants, "\nfor {}", input);
             }
@@ -1283,7 +1290,7 @@ mod tests {
                 constants.iter().zip(expected_constants.iter()).enumerate()
             {
                 match (constant, expected_constant) {
-                    (Object::CompiledFunction(actual), Object::CompiledFunction(expected)) => {
+                    (Constant::CompiledFunction(actual), Constant::CompiledFunction(expected)) => {
                         assert_eq!(
                             actual.to_string(),
                             expected.to_string(),
@@ -1328,8 +1335,8 @@ mod tests {
         num_locals: u8,
         num_parameters: u8,
         nested_ins: Vec<Instructions>,
-    ) -> Object {
-        Object::CompiledFunction(CompiledFunction {
+    ) -> Constant {
+        Constant::CompiledFunction(CompiledFunction {
             instructions: nested_ins.concat(),
             num_locals,
             num_parameters,
