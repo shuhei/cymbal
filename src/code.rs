@@ -1,5 +1,10 @@
 use std::fmt;
 
+pub struct Bytecode {
+    pub instructions: Instructions,
+    pub constants: Vec<Constant>,
+}
+
 // Instructions are a series of bytes.
 pub type Instructions = Vec<u8>;
 

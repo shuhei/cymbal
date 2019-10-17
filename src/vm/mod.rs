@@ -2,8 +2,7 @@ pub mod frame;
 
 use crate::ast::{Infix, Prefix};
 use crate::code;
-use crate::code::{CompiledFunction, Constant, Instructions, OpCode};
-use crate::compiler::Bytecode;
+use crate::code::{Bytecode, CompiledFunction, Constant, Instructions, OpCode};
 use crate::object::{builtin, BuiltinFunction, Closure, EvalError, HashKey, Object};
 pub use crate::vm::frame::Frame;
 use std::cell::RefCell;
@@ -18,7 +17,7 @@ pub const NULL: Object = Object::Null;
 
 #[derive(Debug)]
 pub struct Vm {
-    pub constants: Rc<RefCell<Vec<Constant>>>,
+    pub constants: Vec<Constant>,
 
     stack: Vec<Rc<Object>>,
     sp: usize, // Stack pointer. Always points to the next value. Top of the stack is stack[sp - 1];
@@ -86,9 +85,9 @@ impl Vm {
                     let const_index = code::read_uint16(ins, ip + 1) as usize;
                     self.increment_ip(2);
 
-                    let len = self.constants.borrow().len();
+                    let len = self.constants.len();
                     if const_index < len {
-                        let constant = Object::from_constant(&self.constants.borrow()[const_index]);
+                        let constant = Object::from_constant(&self.constants[const_index]);
                         self.push(Rc::new(constant))?;
                     } else {
                         return Err(VmError::InvalidConstIndex(const_index, len));
@@ -305,14 +304,14 @@ impl Vm {
                     let num_frees = ins[ip + 3] as usize;
                     self.increment_ip(3);
 
-                    let len = self.constants.borrow().len();
+                    let len = self.constants.len();
                     if const_index >= len {
                         return Err(VmError::InvalidConstIndex(const_index, len));
                     }
 
                     // TODO: How can I remove this `clone()`?
                     // Otherwise the compiler complains about `&self.pop()`.
-                    let constant = self.constants.borrow()[const_index].clone();
+                    let constant = self.constants[const_index].clone();
                     if let Constant::CompiledFunction(cf) = constant {
                         let mut free = Vec::with_capacity(num_frees);
                         for _ in 0..num_frees {

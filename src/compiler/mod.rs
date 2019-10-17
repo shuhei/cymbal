@@ -2,7 +2,7 @@ pub mod symbol_table;
 
 use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::code;
-use crate::code::{CompiledFunction, Constant, Instructions, OpCode};
+use crate::code::{Bytecode, CompiledFunction, Constant, Instructions, OpCode};
 pub use crate::compiler::symbol_table::{Symbol, SymbolScope, SymbolTable};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -409,7 +409,7 @@ impl Compiler {
             // TODO: Can't this be done without cloning? Compiler's ownership moves to Bytecode
             // anyway...
             instructions: scope.instructions.clone(),
-            constants: self.constants,
+            constants: self.constants.borrow().clone(),
         };
         bytecode
     }
@@ -512,11 +512,6 @@ impl fmt::Display for CompileError {
     }
 }
 
-pub struct Bytecode {
-    pub instructions: Instructions,
-    pub constants: Rc<RefCell<Vec<Constant>>>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::Compiler;
@@ -527,7 +522,6 @@ mod tests {
     };
     use crate::lexer::Lexer;
     use crate::parser::Parser;
-    use std::borrow::Borrow;
 
     #[test]
     fn compile() {
@@ -1265,30 +1259,21 @@ mod tests {
             }
             let bytecode = compiler.bytecode();
 
+            // Compare instructions.
             assert_eq!(
                 print_instructions(&bytecode.instructions),
                 print_instructions(&expected_instructions.concat()),
                 "\nfor `{}`",
                 input
             );
-            // TODO: Better way?
-            let constants = bytecode
-                .constants
-                .as_ref()
-                .borrow()
-                .iter()
-                .map(|c| {
-                    let con: &Constant = (*c).borrow();
-                    con.clone()
-                })
-                .collect::<Vec<Constant>>();
-            if constants.len() != expected_constants.len() {
-                assert_eq!(constants, expected_constants, "\nfor {}", input);
+
+            if bytecode.constants.len() != expected_constants.len() {
+                assert_eq!(bytecode.constants, expected_constants, "\nfor {}", input);
             }
+
             // Pretty-print instructions in error messages
-            for (i, (constant, expected_constant)) in
-                constants.iter().zip(expected_constants.iter()).enumerate()
-            {
+            let pairs = bytecode.constants.iter().zip(expected_constants.iter());
+            for (i, (constant, expected_constant)) in pairs.enumerate() {
                 match (constant, expected_constant) {
                     (Constant::CompiledFunction(actual), Constant::CompiledFunction(expected)) => {
                         assert_eq!(
