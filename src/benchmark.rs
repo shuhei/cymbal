@@ -5,7 +5,6 @@ use crate::mode::Mode;
 use crate::object::Environment;
 use crate::parser::Parser;
 use crate::vm::Vm;
-use crate::vm;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
@@ -48,8 +47,7 @@ pub fn run(mode: Mode) {
 
             let start = Instant::now();
 
-            let globals = Rc::new(RefCell::new(vm::new_globals()));
-            let mut vm = Vm::new_with_globals_store(bytecode, globals);
+            let mut vm = Vm::new(bytecode);
             vm.run().expect("vm failed");
             let result = vm.last_popped_stack_elem().expect("vm result should exist");
 
