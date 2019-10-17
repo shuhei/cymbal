@@ -18,7 +18,7 @@ pub const NULL: Object = Object::Null;
 
 #[derive(Debug)]
 pub struct Vm {
-    pub constants: Rc<RefCell<Vec<Rc<Constant>>>>,
+    pub constants: Rc<RefCell<Vec<Constant>>>,
 
     stack: Vec<Rc<Object>>,
     sp: usize, // Stack pointer. Always points to the next value. Top of the stack is stack[sp - 1];
@@ -308,9 +308,10 @@ impl Vm {
 
                     let len = self.constants.borrow().len();
                     if const_index < len {
-                        let constant = { Rc::clone(&self.constants.borrow()[const_index]) };
-                        // TODO: Don't clone Rc!
-                        if let Constant::CompiledFunction(cf) = (*constant).clone() {
+                        // TODO: How can I remove this `clone()`?
+                        // Otherwise the compiler complains about `&self.pop()`.
+                        let constant = self.constants.borrow()[const_index].clone();
+                        if let Constant::CompiledFunction(cf) = constant {
                             let mut free = Vec::with_capacity(num_frees);
                             for _ in 0..num_frees {
                                 free.push(Rc::clone(&self.pop()?));
@@ -320,7 +321,7 @@ impl Vm {
                             let closure = Closure { func: cf, free };
                             self.push(Rc::new(Object::Closure(closure)))?;
                         } else {
-                            return Err(VmError::NotFunction(Rc::clone(&constant)));
+                            return Err(VmError::NotFunction(constant));
                         }
                     } else {
                         return Err(VmError::InvalidConstIndex(const_index, len));
@@ -573,7 +574,7 @@ pub enum VmError {
     InvalidConstIndex(usize, usize),
     StackOverflow,
     StackEmpty,
-    NotFunction(Rc<Constant>),
+    NotFunction(Constant),
     Eval(EvalError),
 }
 

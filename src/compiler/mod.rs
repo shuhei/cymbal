@@ -13,7 +13,7 @@ use std::rc::Rc;
 const TENTATIVE_JUMP_POS: u16 = 9999;
 
 pub struct Compiler {
-    pub constants: Rc<RefCell<Vec<Rc<Constant>>>>,
+    pub constants: Rc<RefCell<Vec<Constant>>>,
     symbol_table: Rc<RefCell<SymbolTable>>,
     scopes: Vec<CompilationScope>,
     scope_index: usize,
@@ -30,7 +30,7 @@ impl Compiler {
 
     pub fn new_with_state(
         symbol_table: Rc<RefCell<SymbolTable>>,
-        constants: Rc<RefCell<Vec<Rc<Constant>>>>,
+        constants: Rc<RefCell<Vec<Constant>>>,
     ) -> Self {
         let main_scope = CompilationScope::new();
 
@@ -140,7 +140,7 @@ impl Compiler {
                 }
             }
             Expression::IntegerLiteral(value) => {
-                let constant = Rc::new(Constant::Integer(*value));
+                let constant = Constant::Integer(*value);
                 let const_index = self.add_constant(constant)?;
                 self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
             }
@@ -151,7 +151,7 @@ impl Compiler {
                 self.emit(OpCode::False);
             }
             Expression::StringLiteral(value) => {
-                let constant = Rc::new(Constant::String(value.clone()));
+                let constant = Constant::String(value.clone());
                 let const_index = self.add_constant(constant)?;
                 self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
             }
@@ -297,11 +297,11 @@ impl Compiler {
                     self.load_symbol(free);
                 }
 
-                let compiled_function = Rc::new(Constant::CompiledFunction(CompiledFunction {
+                let compiled_function = Constant::CompiledFunction(CompiledFunction {
                     instructions,
                     num_locals: num_locals as u8,
                     num_parameters: num_params as u8,
-                }));
+                });
                 let const_index = self.add_constant(compiled_function)?;
                 self.emit_with_operands(
                     OpCode::Closure,
@@ -346,7 +346,7 @@ impl Compiler {
         (scope.instructions, free_symbols)
     }
 
-    fn add_constant(&mut self, constant: Rc<Constant>) -> Result<u16, CompileError> {
+    fn add_constant(&mut self, constant: Constant) -> Result<u16, CompileError> {
         let constant_index = self.constants.borrow().len();
         if constant_index >= 0xffff {
             return Err(CompileError::TooManyConstants);
@@ -514,7 +514,7 @@ impl fmt::Display for CompileError {
 
 pub struct Bytecode {
     pub instructions: Instructions,
-    pub constants: Rc<RefCell<Vec<Rc<Constant>>>>,
+    pub constants: Rc<RefCell<Vec<Constant>>>,
 }
 
 #[cfg(test)]
