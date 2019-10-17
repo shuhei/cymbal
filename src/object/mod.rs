@@ -1,9 +1,10 @@
 pub mod builtin;
+pub mod constant;
 pub mod environment;
 
 use crate::ast::{BlockStatement, Infix, Prefix};
 use crate::code;
-use crate::code::Instructions;
+use crate::code::{CompiledFunction, Constant};
 pub use crate::object::environment::Environment;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -70,6 +71,15 @@ fn print_objects(objs: &Vec<Object>) -> String {
 }
 
 impl Object {
+    pub fn from_constant(constant: &Constant) -> Object {
+        match constant {
+            Constant::Integer(value) => Object::Integer(*value),
+            Constant::String(value) => Object::String(value.clone()),
+            // TODO: Can I avoid cloning constants?
+            Constant::CompiledFunction(value) => Object::CompiledFunction(value.clone()),
+        }
+    }
+
     pub fn type_name(&self) -> &str {
         match self {
             Object::Boolean(_) => "BOOLEAN",
@@ -122,25 +132,6 @@ impl HashKey {
             Object::Boolean(value) => Ok(HashKey::Boolean(*value)),
             _ => Err(EvalError::UnsupportedHashKey(obj.clone())),
         }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct CompiledFunction {
-    pub instructions: Instructions,
-    pub num_locals: u8,
-    pub num_parameters: u8,
-}
-
-impl fmt::Display for CompiledFunction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "compiled function ({} locals, {} parameters): {}",
-            self.num_locals,
-            self.num_parameters,
-            code::print_instructions(&self.instructions)
-        )
     }
 }
 

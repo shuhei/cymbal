@@ -2,9 +2,8 @@ pub mod symbol_table;
 
 use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::code;
-use crate::code::{Instructions, OpCode};
+use crate::code::{CompiledFunction, Constant, Instructions, OpCode};
 pub use crate::compiler::symbol_table::{Symbol, SymbolScope, SymbolTable};
-use crate::object::{CompiledFunction, Object};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -14,7 +13,7 @@ use std::rc::Rc;
 const TENTATIVE_JUMP_POS: u16 = 9999;
 
 pub struct Compiler {
-    pub constants: Rc<RefCell<Vec<Rc<Object>>>>,
+    pub constants: Rc<RefCell<Vec<Rc<Constant>>>>,
     symbol_table: Rc<RefCell<SymbolTable>>,
     scopes: Vec<CompilationScope>,
     scope_index: usize,
@@ -31,7 +30,7 @@ impl Compiler {
 
     pub fn new_with_state(
         symbol_table: Rc<RefCell<SymbolTable>>,
-        constants: Rc<RefCell<Vec<Rc<Object>>>>,
+        constants: Rc<RefCell<Vec<Rc<Constant>>>>,
     ) -> Self {
         let main_scope = CompilationScope::new();
 
@@ -141,7 +140,7 @@ impl Compiler {
                 }
             }
             Expression::IntegerLiteral(value) => {
-                let constant = Rc::new(Object::Integer(*value));
+                let constant = Rc::new(Constant::Integer(*value));
                 let const_index = self.add_constant(constant)?;
                 self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
             }
@@ -152,7 +151,7 @@ impl Compiler {
                 self.emit(OpCode::False);
             }
             Expression::StringLiteral(value) => {
-                let constant = Rc::new(Object::String(value.clone()));
+                let constant = Rc::new(Constant::String(value.clone()));
                 let const_index = self.add_constant(constant)?;
                 self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
             }
@@ -298,7 +297,7 @@ impl Compiler {
                     self.load_symbol(free);
                 }
 
-                let compiled_function = Rc::new(Object::CompiledFunction(CompiledFunction {
+                let compiled_function = Rc::new(Constant::CompiledFunction(CompiledFunction {
                     instructions,
                     num_locals: num_locals as u8,
                     num_parameters: num_params as u8,
@@ -347,7 +346,7 @@ impl Compiler {
         (scope.instructions, free_symbols)
     }
 
-    fn add_constant(&mut self, constant: Rc<Object>) -> Result<u16, CompileError> {
+    fn add_constant(&mut self, constant: Rc<Constant>) -> Result<u16, CompileError> {
         let constant_index = self.constants.borrow().len();
         if constant_index >= 0xffff {
             return Err(CompileError::TooManyConstants);
@@ -515,7 +514,7 @@ impl fmt::Display for CompileError {
 
 pub struct Bytecode {
     pub instructions: Instructions,
-    pub constants: Rc<RefCell<Vec<Rc<Object>>>>,
+    pub constants: Rc<RefCell<Vec<Rc<Constant>>>>,
 }
 
 #[cfg(test)]
@@ -523,10 +522,11 @@ mod tests {
     use super::Compiler;
     use crate::ast::Program;
     use crate::code::{
-        make, make_u16, make_u16_u8, make_u8, print_instructions, Instructions, OpCode,
+        make, make_u16, make_u16_u8, make_u8, print_instructions, CompiledFunction, Constant,
+        Instructions, OpCode,
     };
     use crate::lexer::Lexer;
-    use crate::object::{CompiledFunction, Object};
+    use crate::object::Object;
     use crate::parser::Parser;
     use std::borrow::Borrow;
 
@@ -1271,7 +1271,7 @@ mod tests {
                 .borrow()
                 .iter()
                 .map(|c| {
-                    let con: &Object = (*c).borrow();
+                    let con: &Constant = (*c).borrow();
                     con.clone()
                 })
                 .collect::<Vec<Object>>();

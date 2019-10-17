@@ -1,3 +1,5 @@
+use std::fmt;
+
 // Instructions are a series of bytes.
 pub type Instructions = Vec<u8>;
 
@@ -289,6 +291,52 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
             widths: vec![1],
         }
     })
+}
+
+#[derive(Clone, Debug)]
+pub enum Constant {
+    Integer(i64),
+    String(String),
+    CompiledFunction(CompiledFunction),
+}
+
+impl Constant {
+    pub fn type_name(&self) -> &str {
+        match self {
+            Constant::Integer(_) => "INTEGER",
+            Constant::String(_) => "STRING",
+            Constant::CompiledFunction(_) => "COMPILED_FUNCTION",
+        }
+    }
+}
+
+impl fmt::Display for Constant {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Constant::Integer(value) => write!(f, "{}", value),
+            Constant::String(value) => write!(f, "\"{}\"", value),
+            Constant::CompiledFunction(cf) => write!(f, "{}", cf),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CompiledFunction {
+    pub instructions: Instructions,
+    pub num_locals: u8,
+    pub num_parameters: u8,
+}
+
+impl fmt::Display for CompiledFunction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "compiled function ({} locals, {} parameters): {}",
+            self.num_locals,
+            self.num_parameters,
+            print_instructions(&self.instructions)
+        )
+    }
 }
 
 #[cfg(test)]

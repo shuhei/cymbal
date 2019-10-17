@@ -2,11 +2,9 @@ pub mod frame;
 
 use crate::ast::{Infix, Prefix};
 use crate::code;
-use crate::code::{Instructions, OpCode};
+use crate::code::{CompiledFunction, Constant, Instructions, OpCode};
 use crate::compiler::Bytecode;
-use crate::object::{
-    builtin, BuiltinFunction, Closure, CompiledFunction, EvalError, HashKey, Object,
-};
+use crate::object::{builtin, BuiltinFunction, Closure, EvalError, HashKey, Object};
 pub use crate::vm::frame::Frame;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -20,7 +18,7 @@ pub const NULL: Object = Object::Null;
 
 #[derive(Debug)]
 pub struct Vm {
-    pub constants: Rc<RefCell<Vec<Rc<Object>>>>,
+    pub constants: Rc<RefCell<Vec<Rc<Constant>>>>,
 
     stack: Vec<Rc<Object>>,
     sp: usize, // Stack pointer. Always points to the next value. Top of the stack is stack[sp - 1];
@@ -90,8 +88,9 @@ impl Vm {
 
                     let len = self.constants.borrow().len();
                     if const_index < len {
-                        let constant = { Rc::clone(&self.constants.borrow()[const_index]) };
-                        self.push(constant)?;
+                        let constant =
+                            Object::from_constant(&self.constants.borrow()[const_index]);
+                        self.push(Rc::new(constant))?;
                     } else {
                         return Err(VmError::InvalidConstIndex(const_index, len));
                     }
@@ -311,7 +310,7 @@ impl Vm {
                     if const_index < len {
                         let constant = { Rc::clone(&self.constants.borrow()[const_index]) };
                         // TODO: Don't clone Rc!
-                        if let Object::CompiledFunction(cf) = (*constant).clone() {
+                        if let Constant::CompiledFunction(cf) = (*constant).clone() {
                             let mut free = Vec::with_capacity(num_frees);
                             for _ in 0..num_frees {
                                 free.push(Rc::clone(&self.pop()?));
@@ -574,7 +573,7 @@ pub enum VmError {
     InvalidConstIndex(usize, usize),
     StackOverflow,
     StackEmpty,
-    NotFunction(Rc<Object>),
+    NotFunction(Rc<Constant>),
     Eval(EvalError),
 }
 
@@ -587,7 +586,7 @@ impl fmt::Display for VmError {
             }
             VmError::StackOverflow => write!(f, "stack overflow"),
             VmError::StackEmpty => write!(f, "stack empty"),
-            VmError::NotFunction(obj) => write!(f, "not a function: {}", obj.type_name()),
+            VmError::NotFunction(con) => write!(f, "not a function: {}", con.type_name()),
             VmError::Eval(eval_error) => write!(f, "{}", eval_error),
         }
     }

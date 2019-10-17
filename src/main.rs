@@ -14,7 +14,7 @@ fn main() {
         benchmark::run(mode);
     } else {
         let username = env::var("LOGNAME").unwrap_or("anonymous".to_string());
-        println!("Hello {}! This is the Monkey programming language!", username);
+        println!("Hello {}! This is the Monkey programming language in {}!", username, mode);
         println!("Feel free to type in commands");
         repl::start(mode);
     }
