@@ -88,8 +88,7 @@ impl Vm {
 
                     let len = self.constants.borrow().len();
                     if const_index < len {
-                        let constant =
-                            Object::from_constant(&self.constants.borrow()[const_index]);
+                        let constant = Object::from_constant(&self.constants.borrow()[const_index]);
                         self.push(Rc::new(constant))?;
                     } else {
                         return Err(VmError::InvalidConstIndex(const_index, len));
@@ -307,24 +306,24 @@ impl Vm {
                     self.increment_ip(3);
 
                     let len = self.constants.borrow().len();
-                    if const_index < len {
-                        // TODO: How can I remove this `clone()`?
-                        // Otherwise the compiler complains about `&self.pop()`.
-                        let constant = self.constants.borrow()[const_index].clone();
-                        if let Constant::CompiledFunction(cf) = constant {
-                            let mut free = Vec::with_capacity(num_frees);
-                            for _ in 0..num_frees {
-                                free.push(Rc::clone(&self.pop()?));
-                            }
-                            free.reverse();
-
-                            let closure = Closure { func: cf, free };
-                            self.push(Rc::new(Object::Closure(closure)))?;
-                        } else {
-                            return Err(VmError::NotFunction(constant));
-                        }
-                    } else {
+                    if const_index >= len {
                         return Err(VmError::InvalidConstIndex(const_index, len));
+                    }
+
+                    // TODO: How can I remove this `clone()`?
+                    // Otherwise the compiler complains about `&self.pop()`.
+                    let constant = self.constants.borrow()[const_index].clone();
+                    if let Constant::CompiledFunction(cf) = constant {
+                        let mut free = Vec::with_capacity(num_frees);
+                        for _ in 0..num_frees {
+                            free.push(Rc::clone(&self.pop()?));
+                        }
+                        free.reverse();
+
+                        let closure = Closure { func: cf, free };
+                        self.push(Rc::new(Object::Closure(closure)))?;
+                    } else {
+                        return Err(VmError::NotFunction(constant));
                     }
                 }
                 Some(OpCode::GetFree) => {
