@@ -1,7 +1,7 @@
-use std::env;
-use cymbal::repl;
-use cymbal::mode::Mode;
 use cymbal::benchmark;
+use cymbal::mode::Mode;
+use cymbal::repl;
+use std::env;
 
 fn main() {
     let mode = if has_flag("--compile") {
@@ -13,9 +13,6 @@ fn main() {
     if has_flag("--benchmark") {
         benchmark::run(mode);
     } else {
-        let username = env::var("LOGNAME").unwrap_or("anonymous".to_string());
-        println!("Hello {}! This is the Monkey programming language in {}!", username, mode);
-        println!("Feel free to type in commands");
         repl::start(mode);
     }
 }

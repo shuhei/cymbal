@@ -7,14 +7,18 @@ use crate::parser::Parser;
 use crate::vm;
 use crate::vm::Vm;
 use std::cell::RefCell;
+use std::env;
 use std::io;
 use std::io::Write;
 use std::rc::Rc;
 
 pub fn start(mode: Mode) {
-    let mut stdout = io::stdout();
-    let stdin = io::stdin();
-    let mut input = String::new();
+    let username = env::var("LOGNAME").unwrap_or("anonymous".to_string());
+    println!(
+        "Hello {}! This is the Monkey programming language in {}!",
+        username, mode
+    );
+    println!("Feel free to type in commands");
 
     // For evaluator
     let env = Rc::new(RefCell::new(Environment::new()));
@@ -27,15 +31,9 @@ pub fn start(mode: Mode) {
     let globals = Rc::new(RefCell::new(vm::new_globals()));
 
     loop {
-        print!(">> ");
-        stdout.flush().expect("Failed to flush stdout");
-        stdin
-            .read_line(&mut input)
-            .expect("Failed to read line from stdin");
+        let input = ask_input(">> ");
 
-        let lexer = Lexer::new(input.trim());
-        input.clear();
-        let mut parser = Parser::new(lexer);
+        let mut parser = Parser::new(Lexer::new(&input));
 
         let program = parser.parse_program();
         if parser.errors().len() > 0 {
@@ -81,4 +79,20 @@ pub fn start(mode: Mode) {
             }
         }
     }
+}
+
+fn ask_input(prompt: &str) -> String {
+    let mut stdout = io::stdout();
+    let stdin = io::stdin();
+    let mut input = String::new();
+
+    print!("{}", prompt);
+    stdout.flush().expect("Failed to flush stdout");
+    stdin
+        .read_line(&mut input)
+        .expect("Failed to read line from stdin");
+
+    let result = input.trim().to_string();
+    input.clear();
+    result
 }
