@@ -19,10 +19,12 @@ pub fn start(mode: Mode) {
     // For evaluator
     let env = Rc::new(RefCell::new(Environment::new()));
 
-    // For compiler and vm
+    // For compiler and VM
+    // The compiler adds more constants and entries to the symbol table.
     let constants = Rc::new(RefCell::new(Vec::new()));
-    let globals = Rc::new(RefCell::new(vm::new_globals()));
     let symbol_table = Rc::new(RefCell::new(SymbolTable::new_with_builtins()));
+    // The VM adds more globals.
+    let globals = Rc::new(RefCell::new(vm::new_globals()));
 
     loop {
         print!(">> ");
