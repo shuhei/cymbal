@@ -127,7 +127,7 @@ impl SymbolTable {
             let maybe_symbol: Option<&Symbol> =
                 unsafe { mem::transmute(self.current.store.get(name)) };
             if maybe_symbol.is_some() {
-                return maybe_symbol.map(|s| *s);
+                return maybe_symbol.copied();
             }
         }
 

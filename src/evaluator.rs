@@ -80,7 +80,7 @@ fn eval_expression(expression: &Expression, env: Rc<RefCell<Environment>>) -> Ev
     }
 }
 
-fn eval_array_literal(exps: &Vec<Expression>, env: Rc<RefCell<Environment>>) -> EvalResult {
+fn eval_array_literal(exps: &[Expression], env: Rc<RefCell<Environment>>) -> EvalResult {
     let values = eval_expressions(exps, env)?;
     Ok(Object::Array(values))
 }
@@ -123,7 +123,7 @@ fn eval_index_expression(
 }
 
 fn or_null(option: Option<&Object>) -> Object {
-    option.map(|v| v.clone()).unwrap_or(Object::Null)
+    option.cloned().unwrap_or(Object::Null)
 }
 
 fn apply_function(function: Object, arguments: Vec<Object>) -> EvalResult {
@@ -265,7 +265,7 @@ fn eval_identifier(name: &str, env: Rc<RefCell<Environment>>) -> EvalResult {
 }
 
 fn eval_expressions(
-    exps: &Vec<Expression>,
+    exps: &[Expression],
     env: Rc<RefCell<Environment>>,
 ) -> Result<Vec<Object>, EvalError> {
     let mut results = vec![];
