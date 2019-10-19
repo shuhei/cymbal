@@ -55,26 +55,25 @@ pub fn start(mode: Mode) {
                 }
             },
             Mode::Compile => {
-                let mut compiler =
+                let compiler =
                     Compiler::new_with_state(Rc::clone(&symbol_table), Rc::clone(&constants));
-                match compiler.compile(&program) {
+                let bytecode = match compiler.compile(&program) {
+                    Ok(bytecode) => bytecode,
                     Err(err) => {
                         println!("Woops! Compilation failed: {}", err);
                         continue;
                     }
-                    _ => {}
-                }
-                let bytecode = compiler.bytecode();
-                let mut vm = Vm::new_with_globals_store(bytecode, Rc::clone(&globals));
+                };
+
+                let vm = Vm::new_with_globals_store(bytecode, Rc::clone(&globals));
                 match vm.run() {
+                    Ok(result) => {
+                        println!("{}", result);
+                    }
                     Err(err) => {
                         println!("Woops! Executing bytecode failed: {}", err);
                         continue;
                     }
-                    _ => {}
-                }
-                if let Some(result) = vm.last_popped_stack_elem() {
-                    println!("{}", result);
                 }
             }
         }

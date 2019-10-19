@@ -42,11 +42,11 @@ impl Compiler {
         }
     }
 
-    pub fn compile(&mut self, program: &Program) -> Result<(), CompileError> {
+    pub fn compile(mut self, program: &Program) -> Result<Bytecode, CompileError> {
         for statement in &program.statements {
             self.compile_statement(statement)?;
         }
-        Ok(())
+        Ok(self.bytecode())
     }
 
     pub fn compile_statement(&mut self, statement: &Statement) -> Result<(), CompileError> {
@@ -403,15 +403,10 @@ impl Compiler {
         }
     }
 
-    pub fn bytecode(self) -> Bytecode {
+    fn bytecode(&self) -> Bytecode {
         let scope = &self.scopes[self.scope_index];
-        let bytecode = Bytecode {
-            // TODO: Can't this be done without cloning? Compiler's ownership moves to Bytecode
-            // anyway...
-            instructions: scope.instructions.clone(),
-            constants: self.constants.borrow().clone(),
-        };
-        bytecode
+        // TODO: Can't this be done without cloning? Compiler's ownership moves to Bytecode anyway...
+        Bytecode::new(scope.instructions.clone(), self.constants.borrow().clone())
     }
 }
 
@@ -1252,12 +1247,11 @@ mod tests {
         for (input, expected_constants, expected_instructions) in tests {
             let program = parse(input);
 
-            let mut compiler = Compiler::new();
-            match compiler.compile(&program) {
+            let compiler = Compiler::new();
+            let bytecode = match compiler.compile(&program) {
+                Ok(bytecode) => bytecode,
                 Err(error) => panic!("failed to compile input `{}`: {}", input, error),
-                _ => {}
-            }
-            let bytecode = compiler.bytecode();
+            };
 
             // Compare instructions.
             assert_eq!(

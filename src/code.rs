@@ -5,6 +5,15 @@ pub struct Bytecode {
     pub constants: Vec<Constant>,
 }
 
+impl Bytecode {
+    pub fn new(instructions: Instructions, constants: Vec<Constant>) -> Self {
+        Bytecode {
+            instructions: instructions,
+            constants: constants,
+        }
+    }
+}
+
 // Instructions are a series of bytes.
 pub type Instructions = Vec<u8>;
 

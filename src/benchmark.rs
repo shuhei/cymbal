@@ -10,8 +10,7 @@ use std::rc::Rc;
 use std::time::Instant;
 
 pub fn run(mode: Mode) {
-    let code =
-        "let fibonacci = fn(x) {
+    let code = "let fibonacci = fn(x) {
              if (x == 0) {
                  0
              } else {
@@ -36,23 +35,31 @@ pub fn run(mode: Mode) {
             let result = evaluator::eval(&program, env).expect("eval failed");
 
             let elapsed = start.elapsed();
-            println!("{} seconds {} nanoseconds, result: {}", elapsed.as_secs(), elapsed.subsec_nanos(), result);
+            println!(
+                "{} seconds {} nanoseconds, result: {}",
+                elapsed.as_secs(),
+                elapsed.subsec_nanos(),
+                result
+            );
         }
         Mode::Compile => {
             let constants = Rc::new(RefCell::new(Vec::new()));
             let symbol_table = Rc::new(RefCell::new(SymbolTable::new_with_builtins()));
-            let mut compiler = Compiler::new_with_state(symbol_table, constants);
-            compiler.compile(&program).expect("compile failed");
-            let bytecode = compiler.bytecode();
+            let compiler = Compiler::new_with_state(symbol_table, constants);
+            let bytecode = compiler.compile(&program).expect("compile failed");
 
             let start = Instant::now();
 
-            let mut vm = Vm::new(bytecode);
-            vm.run().expect("vm failed");
-            let result = vm.last_popped_stack_elem().expect("vm result should exist");
+            let vm = Vm::new(bytecode);
+            let result = vm.run().expect("vm failed");
 
             let elapsed = start.elapsed();
-            println!("{} seconds {} nanoseconds, result: {}", elapsed.as_secs(), elapsed.subsec_nanos(), result);
+            println!(
+                "{} seconds {} nanoseconds, result: {}",
+                elapsed.as_secs(),
+                elapsed.subsec_nanos(),
+                result
+            );
         }
     }
 }

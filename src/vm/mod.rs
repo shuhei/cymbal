@@ -74,7 +74,7 @@ impl Vm {
         }
     }
 
-    pub fn run(&mut self) -> Result<(), VmError> {
+    pub fn run(mut self) -> Result<Rc<Object>, VmError> {
         while self.current_frame().ip < self.current_frame().instructions().len() {
             let ip = self.current_frame().ip;
             let ins = self.current_frame().instructions();
@@ -338,11 +338,11 @@ impl Vm {
             }
             self.increment_ip(1);
         }
-        Ok(())
-    }
 
-    pub fn last_popped_stack_elem(&self) -> Option<Rc<Object>> {
-        self.stack.get(self.sp).map(|o| Rc::clone(o))
+        self.stack
+            .get(self.sp)
+            .map(|o| Rc::clone(o))
+            .ok_or(VmError::StackEmpty)
     }
 
     fn execute_binary_operation(&mut self, op_code: OpCode) -> Result<(), VmError> {
@@ -593,10 +593,30 @@ impl fmt::Display for VmError {
 
 #[cfg(test)]
 mod tests {
+    use crate::code::Bytecode;
     use crate::compiler::Compiler;
     use crate::lexer::Lexer;
+    use crate::object::Object;
     use crate::parser::Parser;
     use crate::vm::Vm;
+
+    #[test]
+    fn empty_bytecode() {
+        let bytecode = Bytecode::new(vec![], vec![]);
+        let vm = Vm::new(bytecode);
+        match vm.run() {
+            Ok(obj) => {
+                assert_eq!(
+                    *obj,
+                    Object::Null,
+                    "VM should return null for empty bytecode"
+                );
+            }
+            Err(err) => {
+                panic!("vm failed {}", err);
+            }
+        }
+    }
 
     #[test]
     fn integer() {
@@ -976,21 +996,21 @@ mod tests {
 
     fn expect_values(tests: Vec<(&str, &str)>) {
         for (input, expected) in tests {
-            let mut vm = make_vm(input);
-            if let Err(err) = vm.run() {
-                panic!("error on vm for `{}`: {}", input, err);
-            }
-            if let Some(obj) = vm.last_popped_stack_elem() {
-                assert_eq!(&obj.to_string(), expected, "for `{}`", input);
-            } else {
-                panic!("no stack top on vm for `{}`", input);
+            let vm = make_vm(input);
+            match vm.run() {
+                Ok(obj) => {
+                    assert_eq!(&obj.to_string(), expected, "for `{}`", input);
+                }
+                Err(err) => {
+                    panic!("error on vm for `{}`: {}", input, err);
+                }
             }
         }
     }
 
     fn expect_errors(tests: Vec<(&str, &str)>) {
         for (input, expected) in tests {
-            let mut vm = make_vm(input);
+            let vm = make_vm(input);
             match vm.run() {
                 Err(err) => {
                     assert_eq!(&err.to_string(), expected, "for `{}`", input);
@@ -1011,14 +1031,13 @@ mod tests {
             panic!("for input '{}', got parser errors: {:?}", input, errors);
         }
 
-        let mut compiler = Compiler::new();
-        match compiler.compile(&program) {
+        let compiler = Compiler::new();
+        let bytecode = match compiler.compile(&program) {
+            Ok(bytecode) => bytecode,
             Err(err) => {
                 panic!("error on compile for `{}`: {}", input, err);
             }
-            _ => {}
-        }
-        let bytecode = compiler.bytecode();
+        };
         Vm::new(bytecode)
     }
 }
