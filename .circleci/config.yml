@@ -13,6 +13,9 @@ jobs:
           keys:
             - v4-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
+          name: Install components
+          command: rustup component add rustfmt clippy
+      - run:
           name: Build all targets
           command: cargo build --all --all-targets
       - save_cache:
@@ -23,10 +26,16 @@ jobs:
             - target/debug/deps
           key: v4-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
+          name: Format check
+          command: cargo fmt --all -- --check
+      - run:
+          name: Lint
+          command: cargo clippy --all -- -D warnings
+      - run:
           name: Run all tests
           command: cargo test --all
 workflows:
   version: 2
   workflow:
     jobs:
-    - test
+      - test

@@ -13,12 +13,9 @@ pub fn eval(program: &Program, env: Rc<RefCell<Environment>>) -> EvalResult {
         result = eval_statement(statement, Rc::clone(&env))?;
 
         // Stop evaluation if return
-        match result {
-            Object::Return(value) => {
-                // Unwrap the returned value because here's the root of the program.
-                return Ok(*value);
-            }
-            _ => {}
+        if let Object::Return(value) = result {
+            // Unwrap the returned value because here's the root of the program.
+            return Ok(*value);
         }
     }
     Ok(result)

@@ -184,8 +184,8 @@ fn is_whitespace(ch: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::token::Token;
     use crate::lexer::Lexer;
+    use crate::token::Token;
 
     #[test]
     fn next_token() {

@@ -350,18 +350,18 @@ impl Vm {
         let left = self.pop()?;
         match (&*left, &*right) {
             (Object::Integer(l), Object::Integer(r)) => {
-                self.execute_integer_binary_operation(op_code, l, r)
+                self.execute_integer_binary_operation(op_code, *l, *r)
             }
             (Object::String(l), Object::String(r)) => {
                 self.execute_string_binary_operation(op_code, l, r)
             }
             (l, r) => {
                 let infix = infix_from_op_code(op_code).expect("not binary operation");
-                return Err(VmError::Eval(EvalError::TypeMismatch(
+                Err(VmError::Eval(EvalError::TypeMismatch(
                     infix,
                     l.clone(),
                     r.clone(),
-                )));
+                )))
             }
         }
     }
@@ -369,8 +369,8 @@ impl Vm {
     fn execute_integer_binary_operation(
         &mut self,
         op_code: OpCode,
-        left: &i64,
-        right: &i64,
+        left: i64,
+        right: i64,
     ) -> Result<(), VmError> {
         let result = match op_code {
             OpCode::Add => left + right,
@@ -459,7 +459,7 @@ impl Vm {
         match callee {
             Object::Closure(closure) => self.call_closure(num_args, closure),
             Object::Builtin(func) => self.call_builtin(num_args, func),
-            obj => return Err(VmError::Eval(EvalError::NotCallable(obj))),
+            obj => Err(VmError::Eval(EvalError::NotCallable(obj))),
         }
     }
 

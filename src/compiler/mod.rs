@@ -19,13 +19,19 @@ pub struct Compiler {
     scope_index: usize,
 }
 
-impl Compiler {
-    pub fn new() -> Self {
+impl Default for Compiler {
+    fn default() -> Self {
         let symbol_table = Rc::new(RefCell::new(SymbolTable::new_with_builtins()));
 
         let constants = Rc::new(RefCell::new(vec![]));
 
         Compiler::new_with_state(symbol_table, constants)
+    }
+}
+
+impl Compiler {
+    pub fn new() -> Self {
+        Default::default()
     }
 
     pub fn new_with_state(
@@ -415,6 +421,7 @@ pub struct EmittedInstruction {
     pub position: usize,
 }
 
+#[derive(Default)]
 pub struct CompilationScope {
     pub instructions: Instructions,
     last_instruction: Option<EmittedInstruction>,
@@ -423,11 +430,7 @@ pub struct CompilationScope {
 
 impl CompilationScope {
     pub fn new() -> Self {
-        CompilationScope {
-            instructions: vec![],
-            last_instruction: None,
-            previous_instruction: None,
-        }
+        Default::default()
     }
 
     pub fn emit_with_operands(&mut self, op_code: OpCode, operands: Vec<u8>) -> usize {
@@ -477,7 +480,7 @@ impl CompilationScope {
             let position = last.position;
             self.replace_instruction(position, code::make(OpCode::ReturnValue));
             self.last_instruction = Some(EmittedInstruction {
-                position: position,
+                position,
                 op_code: OpCode::ReturnValue,
             });
         }

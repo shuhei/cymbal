@@ -65,7 +65,7 @@ pub enum Expression {
 }
 
 // Have a separate struct to implement `Hash` trait.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct HashLiteral {
     pub pairs: HashMap<Expression, Expression>,
 }
@@ -79,6 +79,20 @@ impl Hash for HashLiteral {
         }
     }
 }
+
+// Clippy complains about Hash impl with derived PartialEq
+impl PartialEq for HashLiteral {
+    fn eq(&self, other: &HashLiteral) -> bool {
+        if self.pairs.len() != other.pairs.len() {
+            return false;
+        }
+        self.pairs
+            .iter()
+            .all(|(key, value)| other.pairs.get(key).map_or(false, |v| *value == *v))
+    }
+}
+
+impl Eq for HashLiteral {}
 
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

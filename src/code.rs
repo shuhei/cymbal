@@ -8,8 +8,8 @@ pub struct Bytecode {
 impl Bytecode {
     pub fn new(instructions: Instructions, constants: Vec<Constant>) -> Self {
         Bytecode {
-            instructions: instructions,
-            constants: constants,
+            instructions,
+            constants,
         }
     }
 }
@@ -128,7 +128,7 @@ pub fn print_instructions(insts: &Instructions) -> String {
             result.push_str(&format!("{:04} ", i));
             i += 1;
             let (operands, offset) = read_operands(&def, insts, i);
-            result.push_str(&format!("{}", def.name));
+            result.push_str(&def.name);
             for operand in operands {
                 result.push_str(&format!(" {}", operand));
             }

@@ -91,7 +91,7 @@ impl fmt::Display for Token {
 }
 
 pub fn lookup_ident(ident: &str) -> Token {
-    keyword_to_token(ident).unwrap_or(Token::Ident(ident.to_owned()))
+    keyword_to_token(ident).unwrap_or_else(|| Token::Ident(ident.to_owned()))
 }
 
 fn keyword_to_token(keyword: &str) -> Option<Token> {
