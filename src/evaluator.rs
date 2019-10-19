@@ -65,7 +65,7 @@ fn eval_expression(expression: &Expression, env: Rc<RefCell<Environment>>) -> Ev
             eval_infix_expression(infix, left.as_ref(), right.as_ref(), env)
         }
         Expression::If(condition, consequence, alternative) => {
-            eval_if_expression(condition.as_ref(), consequence, &alternative.as_ref(), env)
+            eval_if_expression(condition.as_ref(), consequence, alternative.as_ref(), env)
         }
         Expression::Identifier(name) => eval_identifier(name, env),
         Expression::FunctionLiteral(params, body) => {
@@ -240,7 +240,7 @@ fn eval_string_infix_expression(infix: &Infix, left: &str, right: &str) -> EvalR
 fn eval_if_expression(
     condition: &Expression,
     consequence: &BlockStatement,
-    alternative: &Option<&BlockStatement>,
+    alternative: Option<&BlockStatement>,
     env: Rc<RefCell<Environment>>,
 ) -> EvalResult {
     let result = eval_expression(condition, Rc::clone(&env))?;
