@@ -72,7 +72,6 @@ pub fn start(mode: Mode) {
                     }
                     Err(err) => {
                         println!("Woops! Executing bytecode failed: {}", err);
-                        continue;
                     }
                 }
             }
