@@ -2,6 +2,7 @@ use crate::ast::{BlockStatement, Expression, HashLiteral, Infix, Prefix, Program
 use crate::lexer::Lexer;
 use crate::token::Token;
 use std::collections::HashMap;
+use std::mem;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum Precedence {
@@ -70,10 +71,7 @@ impl Parser {
     }
 
     fn next_token(&mut self) {
-        // TODO: Without the `.clone()`, rustc complains
-        // `cannot move out of borrowed content`... Why?
-        self.cur_token = self.peek_token.clone();
-        self.peek_token = self.lexer.next_token();
+        self.cur_token = mem::replace(&mut self.peek_token, self.lexer.next_token());
     }
 
     pub fn parse_program(&mut self) -> Program {
