@@ -212,6 +212,8 @@ mod tests {
             "foo bar"
             [1, 2, 3];
             {"foo": "bar"}
+            "日本語"
+            "🐒"
         "#;
 
         let tests = [
@@ -303,6 +305,8 @@ mod tests {
             Token::Colon,
             Token::String("bar".to_string()),
             Token::Rbrace,
+            Token::String("日本語".to_string()),
+            Token::String("🐒".to_string()),
             Token::Eof,
         ];
 
