@@ -109,7 +109,14 @@ impl Lexer {
                     let ident = self.read_identifier();
                     return token::lookup_ident(ident);
                 } else if is_digit(self.ch) {
-                    return Token::Int(self.read_number().to_string());
+                    let integer_part = self.read_number().to_string();
+                    if self.ch == '.' && is_digit(self.peek_char()) {
+                        self.read_char();
+                        let fractional_part = self.read_number();
+                        return Token::Float(format!("{}.{}", integer_part, fractional_part));
+                    } else {
+                        return Token::Int(integer_part);
+                    }
                 } else {
                     tok = Token::Illegal
                 }
@@ -220,6 +227,9 @@ mod tests {
                 return false;
             }
 
+            0
+            12.345
+            0.12
             10 == 10;
             10 != 9;
             "foobar"
@@ -300,6 +310,9 @@ mod tests {
             Token::False,
             Token::Semicolon,
             Token::Rbrace,
+            Token::Int("0".to_string()),
+            Token::Float("12.345".to_string()),
+            Token::Float("0.12".to_string()),
             Token::Int("10".to_string()),
             Token::Eq,
             Token::Int("10".to_string()),
