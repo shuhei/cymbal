@@ -177,8 +177,15 @@ impl Lexer {
 }
 
 fn is_letter(ch: char) -> bool {
-    // `is_alphabetic` includes kanji but not emoji.
-    ch.is_alphabetic() || ch == '_'
+    ch == '_'
+        || ch == '$'
+        // `is_alphabetic` includes kanji but not emoji.
+        || ch.is_alphabetic()
+        // A rough emoji range
+        // TODO: Review https://unicode.org/Public/emoji/12.0/emoji-data.txt
+        // TODO: What to do with modifiers?
+        || ('\u{203C}' <= ch && ch <= '\u{3299}')
+        || ('\u{1F000}' <= ch && ch <= '\u{1FA95}')
 }
 
 fn is_digit(ch: char) -> bool {
