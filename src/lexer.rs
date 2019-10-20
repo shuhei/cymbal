@@ -1,23 +1,28 @@
 use crate::token;
 use crate::token::Token;
+use std::iter::Peekable;
+use std::mem;
+use std::str::Chars;
 
 pub struct Lexer {
     input: String,
     // Current position in input (points to current char)
     position: usize,
-    // current reading position in input (after current char)
-    read_position: usize,
     // current char under examination
     ch: char,
+    // Use `Chars` to support UTF-8.
+    // https://stackoverflow.com/questions/43952104/how-can-i-store-a-chars-iterator-in-the-same-struct-as-the-string-it-is-iteratin
+    chars: Peekable<Chars<'static>>,
 }
 
 impl Lexer {
     pub fn new(input: String) -> Self {
+        let chars = unsafe { mem::transmute(input.chars().peekable()) };
         let mut lexer = Lexer {
             input,
             position: 0,
-            read_position: 0,
             ch: '\u{0}',
+            chars,
         };
         lexer.read_char();
         lexer
@@ -115,21 +120,14 @@ impl Lexer {
         tok
     }
 
-    // TODO: Support unicode.
-    fn read_char(&mut self) {
-        // TODO: Better way of indexing a string.
-        self.ch = self
-            .input
-            .chars()
-            .nth(self.read_position)
-            .unwrap_or('\u{0}');
-        self.position = self.read_position;
-        self.read_position += 1;
-    }
-
     fn read_identifier(&mut self) -> &str {
         let position = self.position;
-        while is_letter(self.ch) {
+        // The first character needs to be a letter.
+        if is_letter(self.ch) {
+            self.read_char();
+        }
+        // The second character and after can be a letter or a digit.
+        while is_letter(self.ch) || is_digit(self.ch) {
             self.read_char();
         }
         &self.input[position..self.position]
@@ -162,16 +160,32 @@ impl Lexer {
         }
     }
 
-    fn peek_char(&self) -> char {
-        self.input
-            .chars()
-            .nth(self.read_position)
-            .unwrap_or('\u{0}')
+    // -- Low-level methods that touches the `Chars`.
+
+    fn read_char(&mut self) {
+        self.position += if self.ch == '\u{0}' {
+            0
+        } else {
+            self.ch.len_utf8()
+        };
+        self.ch = self.chars.next().unwrap_or('\u{0}');
+    }
+
+    fn peek_char(&mut self) -> char {
+        self.chars.peek().cloned().unwrap_or('\u{0}')
     }
 }
 
 fn is_letter(ch: char) -> bool {
-    'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
+    ch == '_'
+        || ch == '$'
+        // `is_alphabetic` includes kanji but not emoji.
+        || ch.is_alphabetic()
+        // A rough emoji range
+        // TODO: Review https://unicode.org/Public/emoji/12.0/emoji-data.txt
+        // TODO: What to do with modifiers?
+        || ('\u{203C}' <= ch && ch <= '\u{3299}')
+        || ('\u{1F000}' <= ch && ch <= '\u{1FA95}')
 }
 
 fn is_digit(ch: char) -> bool {
@@ -210,8 +224,14 @@ mod tests {
             10 != 9;
             "foobar"
             "foo bar"
+            foo
+            Bar_123
             [1, 2, 3];
             {"foo": "bar"}
+            "日本語"
+            識別子
+            "🐒"
+            let 🙈🙉🙊 = "見ざる聞かざる言わざる"
         "#;
 
         let tests = [
@@ -290,6 +310,8 @@ mod tests {
             Token::Semicolon,
             Token::String("foobar".to_string()),
             Token::String("foo bar".to_string()),
+            Token::Ident("foo".to_string()),
+            Token::Ident("Bar_123".to_string()),
             Token::Lbracket,
             Token::Int("1".to_string()),
             Token::Comma,
@@ -303,6 +325,13 @@ mod tests {
             Token::Colon,
             Token::String("bar".to_string()),
             Token::Rbrace,
+            Token::String("日本語".to_string()),
+            Token::Ident("識別子".to_string()),
+            Token::String("🐒".to_string()),
+            Token::Let,
+            Token::Ident("🙈🙉🙊".to_string()),
+            Token::Assign,
+            Token::String("見ざる聞かざる言わざる".to_string()),
             Token::Eof,
         ];
 
