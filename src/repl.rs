@@ -15,7 +15,7 @@ use std::rc::Rc;
 pub fn start(mode: Mode) {
     let username = env::var("LOGNAME").unwrap_or_else(|_| "anonymous".to_string());
     println!(
-        "Hello {}! This is the Monkey programming language in {}!",
+        "Hello {}! This is the 🐒 programming language in {}!",
         username, mode
     );
     println!("Feel free to type in commands");
