@@ -214,6 +214,7 @@ mod tests {
             {"foo": "bar"}
             "日本語"
             "🐒"
+            let 🙈🙉🙊 = 見ざる聞かざる言わざる
         "#;
 
         let tests = [
@@ -307,6 +308,10 @@ mod tests {
             Token::Rbrace,
             Token::String("日本語".to_string()),
             Token::String("🐒".to_string()),
+            Token::Let,
+            Token::Ident("🙈🙉🙊".to_string()),
+            Token::Assign,
+            Token::Ident("見ざる聞かざる言わざる".to_string()),
             Token::Eof,
         ];
 
