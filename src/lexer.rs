@@ -1,23 +1,28 @@
 use crate::token;
 use crate::token::Token;
+use std::iter::Peekable;
+use std::mem;
+use std::str::Chars;
 
 pub struct Lexer {
     input: String,
     // Current position in input (points to current char)
     position: usize,
-    // current reading position in input (after current char)
-    read_position: usize,
     // current char under examination
     ch: char,
+    // Use `Chars` to support UTF-8.
+    // https://stackoverflow.com/questions/43952104/how-can-i-store-a-chars-iterator-in-the-same-struct-as-the-string-it-is-iteratin
+    chars: Peekable<Chars<'static>>,
 }
 
 impl Lexer {
     pub fn new(input: String) -> Self {
+        let chars = unsafe { mem::transmute(input.chars().peekable()) };
         let mut lexer = Lexer {
             input,
             position: 0,
-            read_position: 0,
             ch: '\u{0}',
+            chars,
         };
         lexer.read_char();
         lexer
@@ -115,18 +120,6 @@ impl Lexer {
         tok
     }
 
-    // TODO: Support unicode.
-    fn read_char(&mut self) {
-        // TODO: Better way of indexing a string.
-        self.ch = self
-            .input
-            .chars()
-            .nth(self.read_position)
-            .unwrap_or('\u{0}');
-        self.position = self.read_position;
-        self.read_position += 1;
-    }
-
     fn read_identifier(&mut self) -> &str {
         let position = self.position;
         // The first character needs to be a letter.
@@ -167,11 +160,19 @@ impl Lexer {
         }
     }
 
-    fn peek_char(&self) -> char {
-        self.input
-            .chars()
-            .nth(self.read_position)
-            .unwrap_or('\u{0}')
+    // -- Low-level methods that touches the `Chars`.
+
+    fn read_char(&mut self) {
+        self.position += if self.ch == '\u{0}' {
+            0
+        } else {
+            self.ch.len_utf8()
+        };
+        self.ch = self.chars.next().unwrap_or('\u{0}');
+    }
+
+    fn peek_char(&mut self) -> char {
+        self.chars.peek().cloned().unwrap_or('\u{0}')
     }
 }
 
