@@ -18,10 +18,5 @@ fn main() {
 }
 
 fn has_flag(flag: &str) -> bool {
-    for arg in env::args() {
-        if arg == flag {
-            return true;
-        }
-    }
-    return false;
+    env::args().any(|arg| arg == flag)
 }

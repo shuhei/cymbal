@@ -16,7 +16,7 @@ macro_rules! builtin {
     };
 }
 
-pub const BUILTINS: &'static [Builtin] = &[
+pub const BUILTINS: &[Builtin] = &[
     builtin!(len),
     builtin!(first),
     builtin!(last),
@@ -85,10 +85,10 @@ fn rest(arguments: Vec<Object>) -> EvalResult {
     assert_argument_count(1, &arguments)?;
     match &arguments[0] {
         Object::Array(values) => {
-            if values.len() > 0 {
-                Ok(Object::Array(values[1..].to_vec()))
-            } else {
+            if values.is_empty() {
                 Ok(Object::Null)
+            } else {
+                Ok(Object::Array(values[1..].to_vec()))
             }
         }
         _ => Err(EvalError::UnsupportedArguments(

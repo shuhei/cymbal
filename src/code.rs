@@ -8,8 +8,8 @@ pub struct Bytecode {
 impl Bytecode {
     pub fn new(instructions: Instructions, constants: Vec<Constant>) -> Self {
         Bytecode {
-            instructions: instructions,
-            constants: constants,
+            instructions,
+            constants,
         }
     }
 }
@@ -116,7 +116,7 @@ impl OpCode {
     }
 }
 
-pub fn print_instructions(insts: &Instructions) -> String {
+pub fn print_instructions(insts: &[u8]) -> String {
     let mut result = String::new();
     let mut i = 0;
     while i < insts.len() {
@@ -128,7 +128,7 @@ pub fn print_instructions(insts: &Instructions) -> String {
             result.push_str(&format!("{:04} ", i));
             i += 1;
             let (operands, offset) = read_operands(&def, insts, i);
-            result.push_str(&format!("{}", def.name));
+            result.push_str(&def.name);
             for operand in operands {
                 result.push_str(&format!(" {}", operand));
             }
@@ -141,7 +141,7 @@ pub fn print_instructions(insts: &Instructions) -> String {
     result
 }
 
-fn read_operands(def: &Definition, insts: &Instructions, start: usize) -> (Vec<usize>, usize) {
+fn read_operands(def: &Definition, insts: &[u8], start: usize) -> (Vec<usize>, usize) {
     let mut offset = 0;
     let mut operands = Vec::with_capacity(def.widths.len());
     for width in &def.widths {
@@ -159,7 +159,7 @@ fn read_operands(def: &Definition, insts: &Instructions, start: usize) -> (Vec<u
     (operands, offset)
 }
 
-pub fn read_uint16(insts: &Instructions, start: usize) -> u16 {
+pub fn read_uint16(insts: &[u8], start: usize) -> u16 {
     u16::from_be_bytes([insts[start], insts[start + 1]])
 }
 

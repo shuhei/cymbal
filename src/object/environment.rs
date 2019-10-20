@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct Environment {
     store: HashMap<String, Object>,
     outer: Option<Rc<RefCell<Environment>>>,
@@ -11,10 +11,7 @@ pub struct Environment {
 
 impl Environment {
     pub fn new() -> Self {
-        Environment {
-            store: HashMap::new(),
-            outer: None,
-        }
+        Default::default()
     }
 
     pub fn extend(outer: Rc<RefCell<Self>>) -> Environment {

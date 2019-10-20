@@ -157,7 +157,7 @@ impl Parser {
             self.next_token();
         }
 
-        expression.map(|exp| Statement::Expression(exp))
+        expression.map(Statement::Expression)
     }
 
     fn parse_block_statement(&mut self) -> Result<BlockStatement> {
@@ -328,15 +328,16 @@ impl Parser {
         let consequence = self.parse_block_statement()?;
         // cur_token: }
 
-        let mut alternative = None;
-        if self.peek_token == Token::Else {
+        let alternative = if self.peek_token == Token::Else {
             self.next_token();
             // cur_token: else
             self.expect_peek(Token::Lbrace, ParserError::ExpectedLbrace)?;
             // cur_token: {
-            alternative = Some(self.parse_block_statement()?);
-            // cur_token: }
-        }
+            Some(self.parse_block_statement()?)
+        // cur_token: }
+        } else {
+            None
+        };
 
         Ok(Expression::If(
             Box::new(condition),
@@ -487,7 +488,7 @@ impl Parser {
         match token {
             Token::Bang => Ok(Prefix::Bang),
             Token::Minus => Ok(Prefix::Minus),
-            token @ _ => Err(ParserError::ExpectedPrefixToken(token.clone())),
+            token => Err(ParserError::ExpectedPrefixToken(token.clone())),
         }
     }
 

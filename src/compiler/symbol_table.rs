@@ -17,6 +17,7 @@ pub struct Symbol {
 }
 
 // TODO: Better naming.
+#[derive(Default)]
 struct SymbolLayer {
     // Either of:
     // - globals & builtins
@@ -32,11 +33,7 @@ struct SymbolLayer {
 
 impl SymbolLayer {
     pub fn new() -> Self {
-        SymbolLayer {
-            store: HashMap::new(),
-            num_definitions: 0,
-            free_symbols: vec![],
-        }
+        Default::default()
     }
 
     pub fn define_free(&mut self, name: &str, original: Symbol) -> Symbol {
@@ -55,6 +52,7 @@ impl SymbolLayer {
     }
 }
 
+#[derive(Default)]
 pub struct SymbolTable {
     // The innermost store.
     current: SymbolLayer,
@@ -66,10 +64,7 @@ pub struct SymbolTable {
 
 impl SymbolTable {
     pub fn new() -> Self {
-        SymbolTable {
-            current: SymbolLayer::new(),
-            outers: vec![],
-        }
+        Default::default()
     }
 
     pub fn new_with_builtins() -> Self {
@@ -98,7 +93,7 @@ impl SymbolTable {
 
     pub fn define(&mut self, name: &str) -> &Symbol {
         // TODO: Check duplication.
-        let scope = if self.outers.len() == 0 {
+        let scope = if self.outers.is_empty() {
             SymbolScope::Global
         } else {
             SymbolScope::Local
@@ -113,7 +108,7 @@ impl SymbolTable {
     }
 
     pub fn define_builtin(&mut self, index: u16, name: &str) -> &Symbol {
-        if self.outers.len() > 0 {
+        if !self.outers.is_empty() {
             panic!("builtin can be defined only on top-level scope");
         }
 
@@ -132,7 +127,7 @@ impl SymbolTable {
             let maybe_symbol: Option<&Symbol> =
                 unsafe { mem::transmute(self.current.store.get(name)) };
             if maybe_symbol.is_some() {
-                return maybe_symbol.map(|s| *s);
+                return maybe_symbol.copied();
             }
         }
 

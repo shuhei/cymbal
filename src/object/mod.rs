@@ -35,7 +35,14 @@ impl fmt::Display for Object {
             Object::Boolean(value) => write!(f, "{}", value),
             Object::Integer(value) => write!(f, "{}", value),
             Object::String(value) => write!(f, "\"{}\"", value),
-            Object::Array(values) => write!(f, "[{}]", print_objects(values),),
+            Object::Array(values) => {
+                let value_list = values
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                write!(f, "[{}]", value_list)
+            }
             Object::Hash(pairs) => {
                 // Print keys with a stable order for testing.
                 let mut items = pairs
@@ -52,22 +59,23 @@ impl fmt::Display for Object {
             }
             Object::Builtin(_) => write!(f, "builtin function"),
             Object::CompiledFunction(cf) => write!(f, "{}", cf),
-            Object::Closure(closure) => write!(
-                f,
-                "closure ({}) ({}): {}",
-                closure.func.num_locals,
-                print_objects(&closure.free.iter().map(|o| (**o).clone()).collect()),
-                code::print_instructions(&closure.func.instructions),
-            ),
+            Object::Closure(closure) => {
+                let free_list = closure
+                    .free
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                write!(
+                    f,
+                    "closure ({}) ({}): {}",
+                    closure.func.num_locals,
+                    free_list,
+                    code::print_instructions(&closure.func.instructions),
+                )
+            }
         }
     }
-}
-
-fn print_objects(objs: &Vec<Object>) -> String {
-    objs.iter()
-        .map(|v| v.to_string())
-        .collect::<Vec<String>>()
-        .join(", ")
 }
 
 impl Object {

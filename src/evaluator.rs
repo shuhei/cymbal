@@ -13,12 +13,9 @@ pub fn eval(program: &Program, env: Rc<RefCell<Environment>>) -> EvalResult {
         result = eval_statement(statement, Rc::clone(&env))?;
 
         // Stop evaluation if return
-        match result {
-            Object::Return(value) => {
-                // Unwrap the returned value because here's the root of the program.
-                return Ok(*value);
-            }
-            _ => {}
+        if let Object::Return(value) = result {
+            // Unwrap the returned value because here's the root of the program.
+            return Ok(*value);
         }
     }
     Ok(result)
@@ -68,7 +65,7 @@ fn eval_expression(expression: &Expression, env: Rc<RefCell<Environment>>) -> Ev
             eval_infix_expression(infix, left.as_ref(), right.as_ref(), env)
         }
         Expression::If(condition, consequence, alternative) => {
-            eval_if_expression(condition.as_ref(), consequence, &alternative.as_ref(), env)
+            eval_if_expression(condition.as_ref(), consequence, alternative.as_ref(), env)
         }
         Expression::Identifier(name) => eval_identifier(name, env),
         Expression::FunctionLiteral(params, body) => {
@@ -83,7 +80,7 @@ fn eval_expression(expression: &Expression, env: Rc<RefCell<Environment>>) -> Ev
     }
 }
 
-fn eval_array_literal(exps: &Vec<Expression>, env: Rc<RefCell<Environment>>) -> EvalResult {
+fn eval_array_literal(exps: &[Expression], env: Rc<RefCell<Environment>>) -> EvalResult {
     let values = eval_expressions(exps, env)?;
     Ok(Object::Array(values))
 }
@@ -126,7 +123,7 @@ fn eval_index_expression(
 }
 
 fn or_null(option: Option<&Object>) -> Object {
-    option.map(|v| v.clone()).unwrap_or(Object::Null)
+    option.cloned().unwrap_or(Object::Null)
 }
 
 fn apply_function(function: Object, arguments: Vec<Object>) -> EvalResult {
@@ -243,7 +240,7 @@ fn eval_string_infix_expression(infix: &Infix, left: &str, right: &str) -> EvalR
 fn eval_if_expression(
     condition: &Expression,
     consequence: &BlockStatement,
-    alternative: &Option<&BlockStatement>,
+    alternative: Option<&BlockStatement>,
     env: Rc<RefCell<Environment>>,
 ) -> EvalResult {
     let result = eval_expression(condition, Rc::clone(&env))?;
@@ -268,7 +265,7 @@ fn eval_identifier(name: &str, env: Rc<RefCell<Environment>>) -> EvalResult {
 }
 
 fn eval_expressions(
-    exps: &Vec<Expression>,
+    exps: &[Expression],
     env: Rc<RefCell<Environment>>,
 ) -> Result<Vec<Object>, EvalError> {
     let mut results = vec![];

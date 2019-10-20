@@ -13,7 +13,7 @@ use std::io::Write;
 use std::rc::Rc;
 
 pub fn start(mode: Mode) {
-    let username = env::var("LOGNAME").unwrap_or("anonymous".to_string());
+    let username = env::var("LOGNAME").unwrap_or_else(|_| "anonymous".to_string());
     println!(
         "Hello {}! This is the Monkey programming language in {}!",
         username, mode
@@ -36,7 +36,7 @@ pub fn start(mode: Mode) {
         let mut parser = Parser::new(Lexer::new(&input));
 
         let program = parser.parse_program();
-        if parser.errors().len() > 0 {
+        if !parser.errors().is_empty() {
             println!("Woops! We ran into some monkey business here!");
             println!(" parser errors:");
             for error in parser.errors() {
