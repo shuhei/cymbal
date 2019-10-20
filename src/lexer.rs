@@ -129,7 +129,12 @@ impl Lexer {
 
     fn read_identifier(&mut self) -> &str {
         let position = self.position;
-        while is_letter(self.ch) {
+        // The first character needs to be a letter.
+        if is_letter(self.ch) {
+            self.read_char();
+        }
+        // The second character and after can be a letter or a digit.
+        while is_letter(self.ch) || is_digit(self.ch) {
             self.read_char();
         }
         &self.input[position..self.position]
