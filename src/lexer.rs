@@ -210,11 +210,13 @@ mod tests {
             10 != 9;
             "foobar"
             "foo bar"
+            foo
+            Bar_123
             [1, 2, 3];
             {"foo": "bar"}
             "日本語"
             "🐒"
-            let 🙈🙉🙊 = 見ざる聞かざる言わざる
+            let 🙈🙉🙊 = "見ざる聞かざる言わざる"
         "#;
 
         let tests = [
@@ -293,6 +295,8 @@ mod tests {
             Token::Semicolon,
             Token::String("foobar".to_string()),
             Token::String("foo bar".to_string()),
+            Token::Ident("foo".to_string()),
+            Token::Ident("Bar_123".to_string()),
             Token::Lbracket,
             Token::Int("1".to_string()),
             Token::Comma,
@@ -311,7 +315,7 @@ mod tests {
             Token::Let,
             Token::Ident("🙈🙉🙊".to_string()),
             Token::Assign,
-            Token::Ident("見ざる聞かざる言わざる".to_string()),
+            Token::String("見ざる聞かざる言わざる".to_string()),
             Token::Eof,
         ];
 
