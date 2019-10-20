@@ -177,7 +177,8 @@ impl Lexer {
 }
 
 fn is_letter(ch: char) -> bool {
-    'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
+    // `is_alphabetic` includes kanji but not emoji.
+    ch.is_alphabetic() || ch == '_'
 }
 
 fn is_digit(ch: char) -> bool {
@@ -221,6 +222,7 @@ mod tests {
             [1, 2, 3];
             {"foo": "bar"}
             "日本語"
+            識別子
             "🐒"
             let 🙈🙉🙊 = "見ざる聞かざる言わざる"
         "#;
@@ -317,6 +319,7 @@ mod tests {
             Token::String("bar".to_string()),
             Token::Rbrace,
             Token::String("日本語".to_string()),
+            Token::Ident("識別子".to_string()),
             Token::String("🐒".to_string()),
             Token::Let,
             Token::Ident("🙈🙉🙊".to_string()),
