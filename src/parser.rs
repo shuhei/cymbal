@@ -537,7 +537,7 @@ mod tests {
             let y = 10;
             let foobar = x + y;
         ";
-        let lexer = Lexer::new(input);
+        let lexer = Lexer::new(input.to_owned());
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program();
@@ -569,7 +569,7 @@ mod tests {
             return 993322;
         ";
 
-        let lexer = Lexer::new(input);
+        let lexer = Lexer::new(input.to_owned());
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program();
@@ -590,7 +590,7 @@ mod tests {
     fn identifier_expression() {
         let input = "foobar;";
 
-        let lexer = Lexer::new(input);
+        let lexer = Lexer::new(input.to_owned());
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program();
@@ -608,7 +608,7 @@ mod tests {
     fn integer_literal_expression() {
         let input = "5;";
 
-        let lexer = Lexer::new(input);
+        let lexer = Lexer::new(input.to_owned());
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program();
@@ -629,7 +629,7 @@ mod tests {
             ("!false;", Prefix::Bang, Expression::Boolean(false)),
         ];
         for (input, operator, value) in tests {
-            let lexer = Lexer::new(input);
+            let lexer = Lexer::new(input.to_owned());
             let mut parser = Parser::new(lexer);
 
             let program = parser.parse_program();
@@ -658,7 +658,7 @@ mod tests {
             ("5 != 5;", 5, Infix::NotEq, 5),
         ];
         for (input, left, operator, right) in tests {
-            let lexer = Lexer::new(input);
+            let lexer = Lexer::new(input.to_owned());
             let mut parser = Parser::new(lexer);
 
             let program = parser.parse_program();
@@ -683,7 +683,7 @@ mod tests {
             ("false == false", false, Infix::Eq, false),
         ];
         for (input, left, operator, right) in tests {
-            let lexer = Lexer::new(input);
+            let lexer = Lexer::new(input.to_owned());
             let mut parser = Parser::new(lexer);
 
             let program = parser.parse_program();
@@ -780,7 +780,7 @@ mod tests {
 
     fn test_parsing(tests: Vec<(&str, &str)>) {
         for (input, expected) in tests {
-            let lexer = Lexer::new(input);
+            let lexer = Lexer::new(input.to_owned());
             let mut parser = Parser::new(lexer);
 
             let program = parser.parse_program();

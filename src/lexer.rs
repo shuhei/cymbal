@@ -12,9 +12,9 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(input: &str) -> Self {
+    pub fn new(input: String) -> Self {
         let mut lexer = Lexer {
-            input: input.to_string(),
+            input,
             position: 0,
             read_position: 0,
             ch: '\u{0}',
@@ -306,7 +306,7 @@ mod tests {
             Token::Eof,
         ];
 
-        let mut lexer = Lexer::new(input);
+        let mut lexer = Lexer::new(input.to_owned());
 
         for (i, expected_token) in tests.iter().enumerate() {
             let token = lexer.next_token();

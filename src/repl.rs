@@ -33,7 +33,7 @@ pub fn start(mode: Mode) {
     loop {
         let input = ask_input(">> ");
 
-        let mut parser = Parser::new(Lexer::new(&input));
+        let mut parser = Parser::new(Lexer::new(input));
 
         let program = parser.parse_program();
         if !parser.errors().is_empty() {

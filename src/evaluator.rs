@@ -633,7 +633,7 @@ mod evalator_tests {
     }
 
     fn eval_input(input: &str) -> EvalResult {
-        let lexer = Lexer::new(input);
+        let lexer = Lexer::new(input.to_owned());
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program();
