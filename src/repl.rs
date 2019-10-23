@@ -90,7 +90,5 @@ fn ask_input(prompt: &str) -> String {
         .read_line(&mut input)
         .expect("Failed to read line from stdin");
 
-    let result = input.trim().to_string();
-    input.clear();
-    result
+    input
 }
