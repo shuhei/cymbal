@@ -235,8 +235,10 @@ fn eval_integer_infix_expression(infix: &Infix, left: i64, right: i64) -> EvalRe
     })
 }
 
+#[allow(clippy::float_cmp)]
 fn eval_float_infix_expression(infix: &Infix, left: f64, right: f64) -> EvalResult {
     Ok(match infix {
+        // Use exact comparison for floats for now.
         Infix::Eq => Object::Boolean(left == right),
         Infix::NotEq => Object::Boolean(left != right),
         Infix::Lt => Object::Boolean(left < right),
