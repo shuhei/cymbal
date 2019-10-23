@@ -310,6 +310,7 @@ fn lookup_definition(byte: u8) -> Option<Definition> {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Constant {
     Integer(i64),
+    Float(f64),
     String(String),
     CompiledFunction(CompiledFunction),
 }
@@ -318,6 +319,7 @@ impl Constant {
     pub fn type_name(&self) -> &str {
         match self {
             Constant::Integer(_) => "INTEGER",
+            Constant::Float(_) => "FLOAT",
             Constant::String(_) => "STRING",
             Constant::CompiledFunction(_) => "COMPILED_FUNCTION",
         }
@@ -328,6 +330,7 @@ impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Constant::Integer(value) => write!(f, "{}", value),
+            Constant::Float(value) => write!(f, "{}", value),
             Constant::String(value) => write!(f, "\"{}\"", value),
             Constant::CompiledFunction(cf) => write!(f, "{}", cf),
         }

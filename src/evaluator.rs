@@ -1,4 +1,4 @@
-use crate::ast::{BlockStatement, Expression, HashLiteral, Infix, Prefix, Program, Statement};
+use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::object::{
     assert_argument_count, builtin, Environment, EvalError, EvalResult, HashKey, Object,
 };
@@ -54,11 +54,12 @@ fn eval_statement(statement: &Statement, env: Rc<RefCell<Environment>>) -> EvalR
 
 fn eval_expression(expression: &Expression, env: Rc<RefCell<Environment>>) -> EvalResult {
     match expression {
-        Expression::IntegerLiteral(int) => Ok(Object::Integer(*int)),
+        Expression::IntegerLiteral(value) => Ok(Object::Integer(*value)),
+        Expression::FloatLiteral(value) => Ok(Object::Float(*value)),
         Expression::StringLiteral(s) => Ok(Object::String(s.to_string())),
         Expression::Boolean(value) => Ok(Object::Boolean(*value)),
         Expression::Array(values) => eval_array_literal(values, env),
-        Expression::Hash(HashLiteral { pairs }) => eval_hash_literal(pairs, env),
+        Expression::Hash(pairs) => eval_hash_literal(pairs, env),
         Expression::Index(left, index) => eval_index_expression(left, index, env),
         Expression::Prefix(prefix, exp) => eval_prefix_expression(prefix, exp.as_ref(), env),
         Expression::Infix(infix, left, right) => {
@@ -86,7 +87,7 @@ fn eval_array_literal(exps: &[Expression], env: Rc<RefCell<Environment>>) -> Eva
 }
 
 fn eval_hash_literal(
-    pairs: &HashMap<Expression, Expression>,
+    pairs: &Vec<(Expression, Expression)>,
     env: Rc<RefCell<Environment>>,
 ) -> EvalResult {
     let mut map = HashMap::new();
