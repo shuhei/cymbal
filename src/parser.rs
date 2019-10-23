@@ -545,7 +545,7 @@ mod tests {
     fn let_statement() {
         let input = "
             let x = 5;
-            let y = 10;
+            let y = 10.23;
             let foobar = x + y;
         ";
         let lexer = Lexer::new(input.to_owned());
@@ -558,7 +558,7 @@ mod tests {
             program.statements,
             vec![
                 Statement::Let("x".to_string(), Expression::IntegerLiteral(5)),
-                Statement::Let("y".to_string(), Expression::IntegerLiteral(10)),
+                Statement::Let("y".to_string(), Expression::FloatLiteral(10.23)),
                 Statement::Let(
                     "foobar".to_string(),
                     Expression::Infix(
@@ -576,7 +576,7 @@ mod tests {
         let input = "
             return;
             return 5;
-            return 10;
+            return 8.0;
             return 993322;
         ";
 
@@ -591,7 +591,7 @@ mod tests {
             vec![
                 Statement::Return(None),
                 Statement::Return(Some(Expression::IntegerLiteral(5))),
-                Statement::Return(Some(Expression::IntegerLiteral(10))),
+                Statement::Return(Some(Expression::FloatLiteral(8.0))),
                 Statement::Return(Some(Expression::IntegerLiteral(993322))),
             ]
         );
@@ -636,6 +636,7 @@ mod tests {
         let tests = vec![
             ("!5;", Prefix::Bang, Expression::IntegerLiteral(5)),
             ("-15;", Prefix::Minus, Expression::IntegerLiteral(15)),
+            ("-0.25;", Prefix::Minus, Expression::FloatLiteral(0.25)),
             ("!true;", Prefix::Bang, Expression::Boolean(true)),
             ("!false;", Prefix::Bang, Expression::Boolean(false)),
         ];

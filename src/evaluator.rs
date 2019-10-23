@@ -87,7 +87,7 @@ fn eval_array_literal(exps: &[Expression], env: Rc<RefCell<Environment>>) -> Eva
 }
 
 fn eval_hash_literal(
-    pairs: &Vec<(Expression, Expression)>,
+    pairs: &[(Expression, Expression)],
     env: Rc<RefCell<Environment>>,
 ) -> EvalResult {
     let mut map = HashMap::new();
@@ -172,6 +172,7 @@ fn eval_prefix_expression(
         Prefix::Bang => Ok(Object::Boolean(!obj.is_truthy())),
         Prefix::Minus => match obj {
             Object::Integer(value) => Ok(Object::Integer(-value)),
+            Object::Float(value) => Ok(Object::Float(-value)),
             _ => Err(EvalError::UnknownPrefixOperator(prefix.clone(), obj)),
         },
     }
@@ -192,6 +193,15 @@ fn eval_infix_expression(
         }
         (Object::Integer(left), Object::Integer(right)) => {
             eval_integer_infix_expression(infix, left, right)
+        }
+        (Object::Integer(left), Object::Float(right)) => {
+            eval_float_infix_expression(infix, left as f64, right)
+        }
+        (Object::Float(left), Object::Integer(right)) => {
+            eval_float_infix_expression(infix, left, right as f64)
+        }
+        (Object::Float(left), Object::Float(right)) => {
+            eval_float_infix_expression(infix, left, right)
         }
         (Object::String(left), Object::String(right)) => {
             eval_string_infix_expression(infix, &left, &right)
@@ -222,6 +232,19 @@ fn eval_integer_infix_expression(infix: &Infix, left: i64, right: i64) -> EvalRe
         Infix::Minus => Object::Integer(left - right),
         Infix::Asterisk => Object::Integer(left * right),
         Infix::Slash => Object::Integer(left / right),
+    })
+}
+
+fn eval_float_infix_expression(infix: &Infix, left: f64, right: f64) -> EvalResult {
+    Ok(match infix {
+        Infix::Eq => Object::Boolean(left == right),
+        Infix::NotEq => Object::Boolean(left != right),
+        Infix::Lt => Object::Boolean(left < right),
+        Infix::Gt => Object::Boolean(left > right),
+        Infix::Plus => Object::Float(left + right),
+        Infix::Minus => Object::Float(left - right),
+        Infix::Asterisk => Object::Float(left * right),
+        Infix::Slash => Object::Float(left / right),
     })
 }
 
@@ -335,6 +358,25 @@ mod evalator_tests {
             ("(5 + 10 * 2 + 15 / 3) * 2 + -10", "50"),
         ]);
     }
+
+    #[test]
+    fn eval_float() {
+        expect_values(vec![
+            // Prefix
+            ("-12.3", "-12.3"),
+            ("-(-12.3)", "12.3"),
+            ("-(2.2 * 3.3)", "-7.26"),
+            // Infix
+            ("2.8 + 3.4", "6.199999999999999"),
+            ("2.0 - 3.1", "-1.1"),
+            ("2.2 * 3.3", "7.26"),
+            ("6.16 / 2.8", "2.2"),
+            ("-50.4 + 100.4 + -50.0", "0.000000000000007105427357601002"),
+        ]);
+    }
+
+    #[test]
+    fn eval_integer_and_float() {}
 
     #[test]
     fn eval_if() {
