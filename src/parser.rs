@@ -1,7 +1,6 @@
-use crate::ast::{BlockStatement, Expression, HashLiteral, Infix, Prefix, Program, Statement};
+use crate::ast::{BlockStatement, Expression, Infix, Prefix, Program, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
-use std::collections::HashMap;
 use std::mem;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -25,6 +24,7 @@ pub enum ParserError {
     ExpectedIdentifierToken(Token),
     ExpectedBooleanToken(Token),
     ExpectedIntegerToken(Token),
+    ExpectedFloatToken(Token),
     ExpectedStringToken(Token),
     ExpectedLparen(Token),
     ExpectedRparen(Token),
@@ -36,6 +36,7 @@ pub enum ParserError {
     ExpectedComma(Token),
     ExpectedColon(Token),
     ParseInt(String),
+    ParseFloat(String),
 }
 
 type PrefixParseFn = fn(&mut Parser) -> Result<Expression>;
@@ -198,6 +199,7 @@ impl Parser {
         match &self.cur_token {
             Token::Ident(_) => Some(Parser::parse_identifier),
             Token::Int(_) => Some(Parser::parse_integer_literal),
+            Token::Float(_) => Some(Parser::parse_float_literal),
             Token::String(_) => Some(Parser::parse_string_literal),
             Token::True => Some(Parser::parse_boolean),
             Token::False => Some(Parser::parse_boolean),
@@ -232,6 +234,17 @@ impl Parser {
             }
         } else {
             Err(ParserError::ExpectedIntegerToken(self.cur_token.clone()))
+        }
+    }
+
+    fn parse_float_literal(&mut self) -> Result<Expression> {
+        if let Token::Float(float) = &self.cur_token {
+            match float.parse() {
+                Ok(value) => Ok(Expression::FloatLiteral(value)),
+                Err(_) => Err(ParserError::ParseFloat(float.to_string())),
+            }
+        } else {
+            Err(ParserError::ExpectedFloatToken(self.cur_token.clone()))
         }
     }
 
@@ -278,7 +291,7 @@ impl Parser {
 
     fn parse_hash_literal(&mut self) -> Result<Expression> {
         // cur_token: {
-        let mut pairs = HashMap::new();
+        let mut pairs = vec![];
 
         while self.peek_token != Token::Rbrace {
             // cur_token: { or ,
@@ -295,7 +308,7 @@ impl Parser {
             let value = self.parse_expression(Precedence::Lowest)?;
             // cur_token: the last token of the value expression
 
-            pairs.insert(key, value);
+            pairs.push((key, value));
 
             if self.peek_token != Token::Rbrace {
                 self.expect_peek(Token::Comma, ParserError::ExpectedComma)?;
@@ -306,7 +319,7 @@ impl Parser {
         self.expect_peek(Token::Rbrace, ParserError::ExpectedRbrace)?;
         // cur_token: }
 
-        Ok(Expression::Hash(HashLiteral { pairs }))
+        Ok(Expression::Hash(pairs))
     }
 
     fn parse_if_expression(&mut self) -> Result<Expression> {
@@ -532,7 +545,7 @@ mod tests {
     fn let_statement() {
         let input = "
             let x = 5;
-            let y = 10;
+            let y = 10.23;
             let foobar = x + y;
         ";
         let lexer = Lexer::new(input.to_owned());
@@ -545,7 +558,7 @@ mod tests {
             program.statements,
             vec![
                 Statement::Let("x".to_string(), Expression::IntegerLiteral(5)),
-                Statement::Let("y".to_string(), Expression::IntegerLiteral(10)),
+                Statement::Let("y".to_string(), Expression::FloatLiteral(10.23)),
                 Statement::Let(
                     "foobar".to_string(),
                     Expression::Infix(
@@ -563,7 +576,7 @@ mod tests {
         let input = "
             return;
             return 5;
-            return 10;
+            return 8.0;
             return 993322;
         ";
 
@@ -578,7 +591,7 @@ mod tests {
             vec![
                 Statement::Return(None),
                 Statement::Return(Some(Expression::IntegerLiteral(5))),
-                Statement::Return(Some(Expression::IntegerLiteral(10))),
+                Statement::Return(Some(Expression::FloatLiteral(8.0))),
                 Statement::Return(Some(Expression::IntegerLiteral(993322))),
             ]
         );
@@ -623,6 +636,7 @@ mod tests {
         let tests = vec![
             ("!5;", Prefix::Bang, Expression::IntegerLiteral(5)),
             ("-15;", Prefix::Minus, Expression::IntegerLiteral(15)),
+            ("-0.25;", Prefix::Minus, Expression::FloatLiteral(0.25)),
             ("!true;", Prefix::Bang, Expression::Boolean(true)),
             ("!false;", Prefix::Bang, Expression::Boolean(false)),
         ];
@@ -771,7 +785,12 @@ mod tests {
             ("{true: 3}", "{true: 3};"),
             (
                 r#"{"one": 1, "two": 2, "three": 3}"#,
-                r#"{"one": 1, "three": 3, "two": 2};"#,
+                r#"{"one": 1, "two": 2, "three": 3};"#,
+            ),
+            // Duplicated entries
+            (
+                r#"{"one": 1, "one": 1, "two": 2}"#,
+                r#"{"one": 1, "one": 1, "two": 2};"#,
             ),
         ]);
     }

@@ -5,7 +5,6 @@ use crate::code;
 use crate::code::{Bytecode, CompiledFunction, Constant, Instructions, OpCode};
 pub use crate::compiler::symbol_table::{Symbol, SymbolScope, SymbolTable};
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::fmt;
 use std::mem;
 use std::rc::Rc;
@@ -150,6 +149,11 @@ impl Compiler {
                 let const_index = self.add_constant(constant)?;
                 self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
             }
+            Expression::FloatLiteral(value) => {
+                let constant = Constant::Float(*value);
+                let const_index = self.add_constant(constant)?;
+                self.emit_with_operands(OpCode::Constant, OpCode::u16(const_index));
+            }
             Expression::Boolean(true) => {
                 self.emit(OpCode::True);
             }
@@ -237,27 +241,12 @@ impl Compiler {
                 }
                 self.emit_with_operands(OpCode::Array, OpCode::u16(exps.len() as u16));
             }
-            Expression::Hash(hash) => {
-                let size = hash.pairs.len();
-                // Have a stable order of hash pairs
-                let mut str_keys = Vec::with_capacity(size);
-                let mut map = HashMap::with_capacity(size);
-                for (key, value) in &hash.pairs {
-                    // Using `String` as key because it's hard to implement
-                    // `PartialOrd` for `Expression`.
-                    let str_key = key.to_string();
-                    // TODO: Is it possible to do this without cloning?
-                    str_keys.push(str_key.clone());
-                    map.insert(str_key, (key, value));
-                }
-                str_keys.sort();
-
-                for str_key in str_keys {
-                    let (key, value) = map.get(&str_key).unwrap();
+            Expression::Hash(pairs) => {
+                for (key, value) in pairs {
                     self.compile_expression(key)?;
                     self.compile_expression(value)?;
                 }
-                self.emit_with_operands(OpCode::Hash, OpCode::u16(size as u16));
+                self.emit_with_operands(OpCode::Hash, OpCode::u16(pairs.len() as u16));
             }
             Expression::Index(left, index) => {
                 self.compile_expression(left)?;
@@ -794,19 +783,19 @@ mod tests {
             (
                 r#"{ 1: "hello", "foo": 1 + 2 }"#,
                 vec![
+                    Constant::Integer(1),
+                    Constant::String("hello".to_string()),
                     Constant::String("foo".to_string()),
                     Constant::Integer(1),
                     Constant::Integer(2),
-                    Constant::Integer(1),
-                    Constant::String("hello".to_string()),
                 ],
                 vec![
                     make_u16(OpCode::Constant, 0),
                     make_u16(OpCode::Constant, 1),
                     make_u16(OpCode::Constant, 2),
-                    make(OpCode::Add),
                     make_u16(OpCode::Constant, 3),
                     make_u16(OpCode::Constant, 4),
+                    make(OpCode::Add),
                     make_u16(OpCode::Hash, 2),
                     make(OpCode::Pop),
                 ],
@@ -836,12 +825,12 @@ mod tests {
             (
                 r#"{"foo": 1 + 2, "bar": 3 + 4}["bar"]"#,
                 vec![
-                    Constant::String("bar".to_string()),
-                    Constant::Integer(3),
-                    Constant::Integer(4),
                     Constant::String("foo".to_string()),
                     Constant::Integer(1),
                     Constant::Integer(2),
+                    Constant::String("bar".to_string()),
+                    Constant::Integer(3),
+                    Constant::Integer(4),
                     Constant::String("bar".to_string()),
                 ],
                 vec![

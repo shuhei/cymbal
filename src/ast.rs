@@ -1,6 +1,4 @@
-use std::collections::HashMap;
 use std::fmt;
-use std::hash::{Hash, Hasher};
 
 #[derive(Debug, PartialEq)]
 pub struct Program {
@@ -16,7 +14,7 @@ impl fmt::Display for Program {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BlockStatement {
     pub statements: Vec<Statement>,
 }
@@ -30,7 +28,7 @@ impl fmt::Display for BlockStatement {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Let(String, Expression),
     Return(Option<Expression>),
@@ -48,14 +46,15 @@ impl fmt::Display for Statement {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Identifier(String),
     IntegerLiteral(i64),
+    FloatLiteral(f64),
     StringLiteral(String),
     Boolean(bool),
     Array(Vec<Expression>),
-    Hash(HashLiteral),
+    Hash(Vec<(Expression, Expression)>),
     Index(Box<Expression>, Box<Expression>),
     Prefix(Prefix, Box<Expression>),
     Infix(Infix, Box<Expression>, Box<Expression>),
@@ -64,52 +63,21 @@ pub enum Expression {
     Call(Box<Expression>, Vec<Expression>),
 }
 
-// Have a separate struct to implement `Hash` trait.
-#[derive(Debug, Clone)]
-pub struct HashLiteral {
-    pub pairs: HashMap<Expression, Expression>,
-}
-
-// `HashMap` cannot derive `Hash` trait.
-impl Hash for HashLiteral {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for (k, v) in &self.pairs {
-            k.hash(state);
-            v.hash(state);
-        }
-    }
-}
-
-// Clippy complains about Hash impl with derived PartialEq
-impl PartialEq for HashLiteral {
-    fn eq(&self, other: &HashLiteral) -> bool {
-        if self.pairs.len() != other.pairs.len() {
-            return false;
-        }
-        self.pairs
-            .iter()
-            .all(|(key, value)| other.pairs.get(key).map_or(false, |v| *value == *v))
-    }
-}
-
-impl Eq for HashLiteral {}
-
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Expression::Identifier(ident) => write!(f, "{}", ident),
-            Expression::IntegerLiteral(int) => write!(f, "{}", int),
+            Expression::IntegerLiteral(value) => write!(f, "{}", value),
+            Expression::FloatLiteral(value) => write!(f, "{}", value),
             // TODO: Escape `"`
             Expression::StringLiteral(s) => write!(f, "\"{}\"", s),
             Expression::Boolean(value) => write!(f, "{}", value),
             Expression::Array(values) => write!(f, "[{}]", comma_separated(values)),
-            Expression::Hash(HashLiteral { pairs }) => {
-                // Print items in a stable order for testing.
-                let mut items = pairs
+            Expression::Hash(pairs) => {
+                let items = pairs
                     .iter()
                     .map(|(k, v)| format!("{}: {}", k, v))
                     .collect::<Vec<String>>();
-                items.sort();
                 write!(f, "{{{}}}", items.join(", "))
             }
             Expression::Index(left, index) => write!(f, "({}[{}])", left, index),
@@ -141,7 +109,7 @@ fn comma_separated(exps: &[Expression]) -> String {
         .join(", ")
 }
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Infix {
     Eq,
     NotEq,
@@ -168,7 +136,7 @@ impl fmt::Display for Infix {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Prefix {
     Bang,
     Minus,

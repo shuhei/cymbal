@@ -129,6 +129,7 @@ impl Vm {
                         Object::Integer(value) => {
                             self.push(Rc::new(Object::Integer(-value)))?;
                         }
+                        Object::Float(value) => self.push(Rc::new(Object::Float(-value)))?,
                         obj => {
                             return Err(VmError::Eval(EvalError::UnknownPrefixOperator(
                                 Prefix::Minus,
@@ -352,6 +353,15 @@ impl Vm {
             (Object::Integer(l), Object::Integer(r)) => {
                 self.execute_integer_binary_operation(op_code, *l, *r)
             }
+            (Object::Integer(l), Object::Float(r)) => {
+                self.execute_float_binary_operation(op_code, *l as f64, *r)
+            }
+            (Object::Float(l), Object::Integer(r)) => {
+                self.execute_float_binary_operation(op_code, *l, *r as f64)
+            }
+            (Object::Float(l), Object::Float(r)) => {
+                self.execute_float_binary_operation(op_code, *l, *r)
+            }
             (Object::String(l), Object::String(r)) => {
                 self.execute_string_binary_operation(op_code, l, r)
             }
@@ -384,6 +394,26 @@ impl Vm {
         };
 
         self.push(Rc::new(Object::Integer(result)))
+    }
+
+    fn execute_float_binary_operation(
+        &mut self,
+        op_code: OpCode,
+        left: f64,
+        right: f64,
+    ) -> Result<(), VmError> {
+        let result = match op_code {
+            OpCode::Add => left + right,
+            OpCode::Sub => left - right,
+            OpCode::Mul => left * right,
+            OpCode::Div => left / right,
+            _ => {
+                // This happens only when this vm is wrong.
+                panic!("not integer binary operation: {:?}", op_code);
+            }
+        };
+
+        self.push(Rc::new(Object::Float(result)))
     }
 
     fn execute_string_binary_operation(
@@ -427,6 +457,13 @@ impl Vm {
                     }
                 }
             }
+            (Object::Integer(l), Object::Float(r)) => {
+                self.execute_float_comparison(op_code, *l as f64, *r)
+            }
+            (Object::Float(l), Object::Integer(r)) => {
+                self.execute_float_comparison(op_code, *l, *r as f64)
+            }
+            (Object::Float(l), Object::Float(r)) => self.execute_float_comparison(op_code, *l, *r),
             (Object::Boolean(l), Object::Boolean(r)) => {
                 match op_code {
                     OpCode::Equal => self.push(Rc::new(Object::Boolean(l == r))),
@@ -449,6 +486,19 @@ impl Vm {
                     l.clone(),
                     r.clone(),
                 )))
+            }
+        }
+    }
+
+    #[allow(clippy::float_cmp)]
+    fn execute_float_comparison(&mut self, op_code: OpCode, l: f64, r: f64) -> Result<(), VmError> {
+        match op_code {
+            OpCode::Equal => self.push(Rc::new(Object::Boolean(l == r))),
+            OpCode::NotEqual => self.push(Rc::new(Object::Boolean(l != r))),
+            OpCode::GreaterThan => self.push(Rc::new(Object::Boolean(l > r))),
+            _ => {
+                // This happens only when this vm is wrong.
+                panic!("unknown operator: {:?}", op_code);
             }
         }
     }
@@ -641,6 +691,43 @@ mod tests {
             ("2 > 1", "true"),
             ("1 < 2", "true"),
             ("2 < 1", "false"),
+        ]);
+    }
+
+    #[test]
+    fn float() {
+        expect_values(vec![
+            ("1.23", "1.23"),
+            ("0.44", "0.44"),
+            ("1.2 + 2.3", "3.5"),
+            ("1.2 - 2.3", "-1.0999999999999999"),
+            ("2.2 * 3.3", "7.26"),
+            ("4.0 / 2.0", "2"),
+            ("1.2 == 1.2", "true"),
+            ("1.0 == 1.1", "false"),
+            ("1.0 != 1.0", "false"),
+            ("1.0 != 2.1", "true"),
+            ("1.0 > 2.2", "false"),
+            ("-2.4 > -2.5", "true"),
+            ("1.2 < 2.2", "true"),
+            ("2.8 < 1.9", "false"),
+        ]);
+    }
+
+    #[test]
+    fn int_and_float() {
+        expect_values(vec![
+            ("1 + 2.3", "3.3"),
+            ("1.2 - 2", "-0.8"),
+            ("2.2 * 3", "6.6000000000000005"),
+            ("4 / 2.0", "2"),
+            ("1 == 1.0", "true"),
+            ("1.0 != 1", "false"),
+            ("1.0 != 2.1", "true"),
+            ("1 > 2.2", "false"),
+            ("-2 > -2.5", "true"),
+            ("1.2 < 2", "true"),
+            ("2.8 < 1", "false"),
         ]);
     }
 

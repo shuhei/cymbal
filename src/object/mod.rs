@@ -18,6 +18,7 @@ pub type BuiltinFunction = fn(Vec<Object>) -> EvalResult;
 pub enum Object {
     Boolean(bool),
     Integer(i64),
+    Float(f64),
     String(String),
     Array(Vec<Object>),
     Hash(HashMap<HashKey, Object>),
@@ -34,6 +35,7 @@ impl fmt::Display for Object {
         match self {
             Object::Boolean(value) => write!(f, "{}", value),
             Object::Integer(value) => write!(f, "{}", value),
+            Object::Float(value) => write!(f, "{}", value),
             Object::String(value) => write!(f, "\"{}\"", value),
             Object::Array(values) => {
                 let value_list = values
@@ -82,6 +84,7 @@ impl Object {
     pub fn from_constant(constant: &Constant) -> Object {
         match constant {
             Constant::Integer(value) => Object::Integer(*value),
+            Constant::Float(value) => Object::Float(*value),
             Constant::String(value) => Object::String(value.clone()),
             // TODO: Can I avoid cloning constants?
             Constant::CompiledFunction(value) => Object::CompiledFunction(value.clone()),
@@ -92,6 +95,7 @@ impl Object {
         match self {
             Object::Boolean(_) => "BOOLEAN",
             Object::Integer(_) => "INTEGER",
+            Object::Float(_) => "FLOAT",
             Object::String(_) => "STRING",
             Object::Array(_) => "ARRAY",
             Object::Hash(_) => "HASH",
