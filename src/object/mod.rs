@@ -1,5 +1,4 @@
 pub mod builtin;
-pub mod constant;
 pub mod environment;
 
 use crate::ast::{BlockStatement, Infix, Prefix};
