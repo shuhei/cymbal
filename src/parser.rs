@@ -17,7 +17,7 @@ pub enum Precedence {
 
 type Result<T> = std::result::Result<T, ParserError>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ParserError {
     ExpectedPrefixToken(Token),
     ExpectedInfixToken(Token),
@@ -75,7 +75,7 @@ impl Parser {
         self.cur_token = mem::replace(&mut self.peek_token, self.lexer.next_token());
     }
 
-    pub fn parse_program(&mut self) -> Program {
+    pub fn parse_program(mut self) -> Result<Program> {
         let mut statements = vec![];
 
         while self.cur_token != Token::Eof {
@@ -90,7 +90,12 @@ impl Parser {
             self.next_token();
         }
 
-        Program { statements }
+        if self.errors.is_empty() {
+            Ok(Program { statements })
+        } else {
+            // TODO: Can we do this without clone()?
+            Err(self.errors[0].clone())
+        }
     }
 
     fn parse_statement(&mut self) -> Result<Statement> {
@@ -549,10 +554,9 @@ mod tests {
             let foobar = x + y;
         ";
         let lexer = Lexer::new(input.to_owned());
-        let mut parser = Parser::new(lexer);
+        let parser = Parser::new(lexer);
 
-        let program = parser.parse_program();
-        check_parser_errors(&parser);
+        let program = parser.parse_program().expect("parser error");
 
         assert_eq!(
             program.statements,
@@ -581,10 +585,9 @@ mod tests {
         ";
 
         let lexer = Lexer::new(input.to_owned());
-        let mut parser = Parser::new(lexer);
+        let parser = Parser::new(lexer);
 
-        let program = parser.parse_program();
-        check_parser_errors(&parser);
+        let program = parser.parse_program().expect("parser error");
 
         assert_eq!(
             program.statements,
@@ -602,10 +605,9 @@ mod tests {
         let input = "foobar;";
 
         let lexer = Lexer::new(input.to_owned());
-        let mut parser = Parser::new(lexer);
+        let parser = Parser::new(lexer);
 
-        let program = parser.parse_program();
-        check_parser_errors(&parser);
+        let program = parser.parse_program().expect("parser error");
 
         assert_eq!(
             program.statements,
@@ -620,10 +622,9 @@ mod tests {
         let input = "5;";
 
         let lexer = Lexer::new(input.to_owned());
-        let mut parser = Parser::new(lexer);
+        let parser = Parser::new(lexer);
 
-        let program = parser.parse_program();
-        check_parser_errors(&parser);
+        let program = parser.parse_program().expect("parser error");
 
         assert_eq!(
             program.statements,
@@ -642,10 +643,9 @@ mod tests {
         ];
         for (input, operator, value) in tests {
             let lexer = Lexer::new(input.to_owned());
-            let mut parser = Parser::new(lexer);
+            let parser = Parser::new(lexer);
 
-            let program = parser.parse_program();
-            check_parser_errors(&parser);
+            let program = parser.parse_program().expect("parser error");
 
             assert_eq!(
                 program.statements,
@@ -671,10 +671,9 @@ mod tests {
         ];
         for (input, left, operator, right) in tests {
             let lexer = Lexer::new(input.to_owned());
-            let mut parser = Parser::new(lexer);
+            let parser = Parser::new(lexer);
 
-            let program = parser.parse_program();
-            check_parser_errors(&parser);
+            let program = parser.parse_program().expect("parser error");
 
             assert_eq!(
                 program.statements,
@@ -696,10 +695,9 @@ mod tests {
         ];
         for (input, left, operator, right) in tests {
             let lexer = Lexer::new(input.to_owned());
-            let mut parser = Parser::new(lexer);
+            let parser = Parser::new(lexer);
 
-            let program = parser.parse_program();
-            check_parser_errors(&parser);
+            let program = parser.parse_program().expect("parser error");
 
             assert_eq!(
                 program.statements,
@@ -798,23 +796,11 @@ mod tests {
     fn test_parsing(tests: Vec<(&str, &str)>) {
         for (input, expected) in tests {
             let lexer = Lexer::new(input.to_owned());
-            let mut parser = Parser::new(lexer);
+            let parser = Parser::new(lexer);
 
-            let program = parser.parse_program();
-            check_parser_errors(&parser);
+            let program = parser.parse_program().expect("parser error");
 
             assert_eq!(program.to_string(), expected);
-        }
-    }
-
-    fn check_parser_errors(parser: &Parser) {
-        let errors = parser.errors();
-        if errors.len() > 0 {
-            panic!(
-                "for input '{}', got parser errors: {:?}",
-                parser.input(),
-                errors
-            );
         }
     }
 }

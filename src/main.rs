@@ -43,15 +43,14 @@ fn main() {
 }
 
 fn compile(source: String) -> Result<(), ()> {
-    let mut parser = Parser::new(Lexer::new(source));
-    let program = parser.parse_program();
-    if !parser.errors().is_empty() {
-        println!(" parser errors:");
-        for error in parser.errors() {
-            println!("\t{:?}", error);
+    let parser = Parser::new(Lexer::new(source));
+    let program = match parser.parse_program() {
+        Ok(pg) => pg,
+        Err(err) => {
+            println!("{:?}", err);
+            return Err(());
         }
-        return Err(());
-    }
+    };
     let compiler = Compiler::new();
     match compiler.compile(&program) {
         Ok(_) => {

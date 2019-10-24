@@ -679,9 +679,9 @@ mod evalator_tests {
 
     fn eval_input(input: &str) -> EvalResult {
         let lexer = Lexer::new(input.to_owned());
-        let mut parser = Parser::new(lexer);
+        let parser = Parser::new(lexer);
 
-        let program = parser.parse_program();
+        let program = parser.parse_program().expect("parser error");
         let env = Rc::new(RefCell::new(Environment::new()));
         evaluator::eval(&program, env)
     }

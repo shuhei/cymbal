@@ -1111,12 +1111,8 @@ mod tests {
 
     fn make_vm(input: &str) -> Vm {
         let lexer = Lexer::new(input.to_owned());
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
-        let errors = parser.errors();
-        if errors.len() > 0 {
-            panic!("for input '{}', got parser errors: {:?}", input, errors);
-        }
+        let parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("parser error");
 
         let compiler = Compiler::new();
         let bytecode = match compiler.compile(&program) {
