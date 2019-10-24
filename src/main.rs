@@ -7,22 +7,15 @@ use std::process;
 fn main() {
     let maybe_subcommand = env::args().nth(1);
     match maybe_subcommand {
-        Some(subcommand) => {
-            let mode = if has_flag("--compile") {
-                Mode::Compile
-            } else {
-                Mode::Eval
-            };
-            match subcommand.as_ref() {
-                "repl" => repl::start(mode),
-                "benchmark" => benchmark::run(mode),
-                unknown => {
-                    println!("cymbal: '{}' is not a valid subcommand\n", unknown);
-                    help();
-                    process::exit(1);
-                }
+        Some(subcommand) => match subcommand.as_ref() {
+            "repl" => repl::start(eval_or_compile()),
+            "benchmark" => benchmark::run(eval_or_compile()),
+            unknown => {
+                println!("cymbal: '{}' is not a valid subcommand\n", unknown);
+                help();
+                process::exit(1);
             }
-        }
+        },
         None => {
             help();
         }
@@ -46,4 +39,12 @@ Subcommands:
 
 fn has_flag(flag: &str) -> bool {
     env::args().any(|arg| arg == flag)
+}
+
+fn eval_or_compile() -> Mode {
+    if has_flag("--compile") {
+        Mode::Compile
+    } else {
+        Mode::Eval
+    }
 }
