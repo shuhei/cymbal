@@ -10,12 +10,12 @@ Start REPL:
 
 ```sh
 # Run in eval mode to directly evaluate AST
-cargo run
+cargo run -- repl
 # or
-cargo run -- --eval
+cargo run -- repl --eval
 
 # Run in compile mode to compile AST into bytecode and execute it on VM
-cargo run -- --compile
+cargo run -- repl --compile
 ```
 
 Build:
@@ -33,8 +33,8 @@ cargo test
 Benchmark with recursive fibonacci:
 
 ```sh
-cargo run --release -- --benchmark --eval
-cargo run --release -- --benchmark --compile
+cargo run --release -- benchmark --eval
+cargo run --release -- benchmark --compile
 ```
 
 ## License
