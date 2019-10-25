@@ -27,7 +27,6 @@ impl Bytecode {
 
 impl Serializable for Bytecode {
     fn serialize(&self, w: &mut dyn io::Write) -> io::Result<()> {
-        // TODO: BE or LE?
         w.write_all(&(self.instructions.len() as u64).to_be_bytes())?;
         w.write_all(&self.instructions)?;
         w.write_all(&(self.constants.len() as u64).to_be_bytes())?;
