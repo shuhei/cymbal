@@ -1,4 +1,15 @@
 use std::fmt;
+use std::io;
+
+trait Serializable {
+    fn serialize(&self, f: &mut dyn io::Write) -> io::Result<()>;
+
+    /*
+    fn deserialize(reader: &dyn io::Read) -> Result<Self, ()>
+    where
+        Self: Sized;
+    */
+}
 
 pub struct Bytecode {
     pub instructions: Instructions,
@@ -11,6 +22,19 @@ impl Bytecode {
             instructions,
             constants,
         }
+    }
+}
+
+impl Serializable for Bytecode {
+    fn serialize(&self, w: &mut dyn io::Write) -> io::Result<()> {
+        // TODO: BE or LE?
+        w.write_all(&(self.instructions.len() as u64).to_be_bytes())?;
+        w.write_all(&self.instructions)?;
+        w.write_all(&(self.constants.len() as u64).to_be_bytes())?;
+        for constant in &self.constants {
+            constant.serialize(w)?;
+        }
+        io::Result::Ok(())
     }
 }
 
@@ -323,6 +347,38 @@ impl Constant {
             Constant::String(_) => "STRING",
             Constant::CompiledFunction(_) => "COMPILED_FUNCTION",
         }
+    }
+}
+
+const TAG_INTEGER: u8 = 1;
+const TAG_FLOAT: u8 = 2;
+const TAG_STRING: u8 = 3;
+const TAG_FUNCTION: u8 = 4;
+
+impl Serializable for Constant {
+    fn serialize(&self, w: &mut dyn io::Write) -> io::Result<()> {
+        match self {
+            Constant::Integer(value) => {
+                w.write_all(&TAG_INTEGER.to_be_bytes())?;
+                w.write_all(&value.to_be_bytes())?;
+            }
+            Constant::Float(value) => {
+                w.write_all(&TAG_FLOAT.to_be_bytes())?;
+                // https://github.com/rust-lang/rust/issues/60446
+                w.write_all(&value.to_bits().to_be_bytes())?;
+            }
+            Constant::String(value) => {
+                w.write_all(&TAG_STRING.to_be_bytes())?;
+                w.write_all(&(value.len() as u64).to_be_bytes())?;
+                w.write_all(value.as_bytes())?;
+            }
+            Constant::CompiledFunction(cf) => {
+                w.write_all(&[TAG_FUNCTION, cf.num_locals, cf.num_parameters])?;
+                w.write_all(&(cf.instructions.len() as u64).to_be_bytes())?;
+                w.write_all(&cf.instructions)?;
+            }
+        }
+        io::Result::Ok(())
     }
 }
 
