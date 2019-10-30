@@ -1,7 +1,8 @@
+use std::convert::TryInto;
 use std::fmt;
 use std::io;
 
-trait Serializable {
+pub trait Serializable {
     fn serialize(&self, f: &mut dyn io::Write) -> io::Result<()>;
 
     /*
@@ -23,6 +24,63 @@ impl Bytecode {
             constants,
         }
     }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
+        // TODO: What happens on 32-bit systems?
+        let instructions_size = read_be_u64(bytes, 0) as usize;
+        let instructions = bytes[8..(8 + instructions_size)].to_vec();
+
+        // let constants_size = read_be_u64(&bytes[(8 + instructions_size)..]) as usize;
+        let mut cur = 16 + instructions_size;
+        let mut constants = Vec::new();
+        while cur < bytes.len() {
+            let tag = bytes[cur];
+            cur += 1;
+
+            if tag == TAG_INTEGER {
+                constants.push(Constant::Integer(read_be_i64(bytes, cur)));
+                cur += 8;
+            } else if tag == TAG_FLOAT {
+                constants.push(Constant::Float(f64::from_bits(read_be_u64(bytes, cur))));
+                cur += 8;
+            } else if tag == TAG_STRING {
+                let string_len = read_be_u64(bytes, cur) as usize;
+                cur += 8;
+                let string = String::from_utf8(bytes[cur..(cur + string_len)].to_vec())
+                    .expect("error: Failed to read string constant");
+                cur += string_len;
+                constants.push(Constant::String(string));
+            } else if tag == TAG_FUNCTION {
+                let num_locals = bytes[cur];
+                let num_parameters = bytes[cur + 1];
+                cur += 2;
+                let instructions_size = read_be_u64(bytes, cur) as usize;
+                cur += 8;
+                let instructions = bytes[cur..(cur + instructions_size)].to_vec();
+                cur += instructions_size;
+                let cf = CompiledFunction {
+                    instructions,
+                    num_locals,
+                    num_parameters,
+                };
+                constants.push(Constant::CompiledFunction(cf));
+            } else {
+                return Err(format!("Unexpected tag {} at position {}", tag, cur).to_string());
+            }
+        }
+
+        Ok(Bytecode::new(instructions, constants))
+    }
+}
+
+fn read_be_u64(bytes: &[u8], start: usize) -> u64 {
+    // https://doc.rust-lang.org/std/primitive.u64.html#method.from_be_bytes
+    u64::from_be_bytes(bytes[start..(start + 8)].try_into().unwrap())
+}
+
+fn read_be_i64(bytes: &[u8], start: usize) -> i64 {
+    // https://doc.rust-lang.org/std/primitive.i64.html#method.from_be_bytes
+    i64::from_be_bytes(bytes[start..(start + 8)].try_into().unwrap())
 }
 
 impl Serializable for Bytecode {
