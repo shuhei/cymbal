@@ -11,20 +11,15 @@ use std::fs;
 use std::process;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    match args.get(1) {
+    match env::args().nth(1) {
         Some(subcommand) => match subcommand.as_ref() {
             "repl" => repl::start(eval_or_compile()),
             "benchmark" => benchmark::run(eval_or_compile()),
             "compile" => {
-                let source_path = args
-                    .get(2)
-                    .expect("error: specify a source file to compile");
-                compile(source_path);
+                compile();
             }
             "run" => {
-                let source_path = args.get(2).expect("error: specify a bytecode file to run");
-                run(source_path);
+                run();
             }
             "help" => {
                 help();
@@ -41,7 +36,11 @@ fn main() {
 
 // -- Actions
 
-fn compile(source_path: &str) {
+fn compile() {
+    let source_path = env::args()
+        .nth(2)
+        .expect("error: specify a source file to compile");
+
     let source = fs::read_to_string(source_path).expect("error: failed to read a source file");
     let parser = Parser::new(Lexer::new(source));
     let program = parser
@@ -59,7 +58,10 @@ fn compile(source_path: &str) {
     println!("Wrote bytecode into 'out.mo'");
 }
 
-fn run(source_path: &str) {
+fn run() {
+    let source_path = env::args()
+        .nth(2)
+        .expect("error: specify a bytecode file to run");
     let bytes = fs::read(source_path).expect("error: failed to read a bytecode file");
     let bytecode = Bytecode::from_bytes(&bytes).expect("error: Failed to deserialize bytecode");
     let vm = Vm::new(bytecode);
