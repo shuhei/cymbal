@@ -4,12 +4,6 @@ use std::io;
 
 pub trait Serializable {
     fn serialize(&self, f: &mut dyn io::Write) -> io::Result<()>;
-
-    /*
-    fn deserialize(reader: &dyn io::Read) -> Result<Self, ()>
-    where
-        Self: Sized;
-    */
 }
 
 pub struct Bytecode {
@@ -26,12 +20,16 @@ impl Bytecode {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
+        let mut cur = 0;
         // TODO: What happens on 32-bit systems?
-        let instructions_size = read_be_u64(bytes, 0) as usize;
-        let instructions = bytes[8..(8 + instructions_size)].to_vec();
+        let instructions_size = read_be_u64(bytes, cur) as usize;
+        cur += 8;
+        let instructions = bytes[cur..(cur + instructions_size)].to_vec();
+        cur += instructions_size;
 
-        // let constants_size = read_be_u64(&bytes[(8 + instructions_size)..]) as usize;
-        let mut cur = 16 + instructions_size;
+        let constants_count = read_be_u64(bytes, cur) as usize;
+        cur += 8;
+
         let mut constants = Vec::new();
         while cur < bytes.len() {
             let tag = bytes[cur];
@@ -65,8 +63,16 @@ impl Bytecode {
                 };
                 constants.push(Constant::CompiledFunction(cf));
             } else {
-                return Err(format!("Unexpected tag {} at position {}", tag, cur).to_string());
+                return Err(format!("Unexpected tag {} at position {}", tag, cur));
             }
+        }
+
+        if constants.len() != constants_count {
+            return Err(format!(
+                "Invalid constants cound: expect {} but got {}",
+                constants_count,
+                constants.len()
+            ));
         }
 
         Ok(Bytecode::new(instructions, constants))
