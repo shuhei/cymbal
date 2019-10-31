@@ -64,11 +64,11 @@ fn compile(source: String) -> Result<(), ()> {
         .compile(&program)
         .expect("error: Failed to compile");
     // TODO: Make the output path flexible.
-    let mut file = fs::File::create("out.mko").expect("error: Failed to open an output file");
+    let mut file = fs::File::create("out.mo").expect("error: Failed to open an output file");
     bytecode
         .serialize(&mut file)
         .expect("error: Failed to serialize bytecode");
-    println!("Wrote bytecode into 'out.mko'");
+    println!("Wrote bytecode into 'out.mo'");
     Ok(())
 }
 
