@@ -20,27 +20,17 @@ fn main() {
                 let source_path = args
                     .get(2)
                     .expect("error: specify a source file to compile");
-                let source =
-                    fs::read_to_string(source_path).expect("error: failed to read a source file");
-                match compile(source) {
-                    Ok(_) => {}
-                    Err(_) => {
-                        process::exit(1);
-                    }
-                }
+                compile(source_path);
             }
             "run" => {
                 let source_path = args.get(2).expect("error: specify a bytecode file to run");
-                let bytes = fs::read(source_path).expect("error: failed to read a bytecode file");
-                let bytecode =
-                    Bytecode::from_bytes(&bytes).expect("error: Failed to deserialize bytecode");
-                let vm = Vm::new(bytecode);
-                vm.run().expect("error: Failed to run bytecode");
+                run(source_path);
+            }
+            "help" => {
+                help();
             }
             unknown => {
-                println!("cymbal: '{}' is not a valid subcommand\n", unknown);
-                help();
-                process::exit(1);
+                unknown_subcommand(unknown);
             }
         },
         None => {
@@ -49,16 +39,14 @@ fn main() {
     }
 }
 
-// TODO: Clean up error handling.
-fn compile(source: String) -> Result<(), ()> {
+// -- Actions
+
+fn compile(source_path: &str) {
+    let source = fs::read_to_string(source_path).expect("error: failed to read a source file");
     let parser = Parser::new(Lexer::new(source));
-    let program = match parser.parse_program() {
-        Ok(pg) => pg,
-        Err(err) => {
-            println!("{:?}", err);
-            return Err(());
-        }
-    };
+    let program = parser
+        .parse_program()
+        .expect("error: Failed to parse source");
     let compiler = Compiler::new();
     let bytecode = compiler
         .compile(&program)
@@ -69,7 +57,13 @@ fn compile(source: String) -> Result<(), ()> {
         .serialize(&mut file)
         .expect("error: Failed to serialize bytecode");
     println!("Wrote bytecode into 'out.mo'");
-    Ok(())
+}
+
+fn run(source_path: &str) {
+    let bytes = fs::read(source_path).expect("error: failed to read a bytecode file");
+    let bytecode = Bytecode::from_bytes(&bytes).expect("error: Failed to deserialize bytecode");
+    let vm = Vm::new(bytecode);
+    vm.run().expect("error: Failed to run bytecode");
 }
 
 fn help() {
@@ -86,6 +80,14 @@ Subcommands:
 "#
     );
 }
+
+fn unknown_subcommand(subcommand: &str) {
+    println!("cymbal: '{}' is not a valid subcommand\n", subcommand);
+    help();
+    process::exit(1);
+}
+
+// -- Helpers
 
 fn has_flag(flag: &str) -> bool {
     env::args().any(|arg| arg == flag)
