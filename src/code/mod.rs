@@ -6,6 +6,7 @@ pub trait Serializable {
     fn serialize(&self, f: &mut dyn io::Write) -> io::Result<()>;
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Bytecode {
     pub instructions: Instructions,
     pub constants: Vec<Constant>,
@@ -477,7 +478,7 @@ impl fmt::Display for CompiledFunction {
 
 #[cfg(test)]
 mod tests {
-    use crate::code::{make, make_u16, make_u16_u8, make_u8, print_instructions, OpCode};
+    use crate::code::{make, make_u16, make_u16_u8, make_u8, print_instructions, Bytecode, OpCode};
 
     #[test]
     fn test_print_instructions() {
@@ -498,5 +499,18 @@ mod tests {
 0015 OpPop";
 
         assert_eq!(&print_instructions(&insts), expected);
+    }
+
+    #[test]
+    fn empty_bytecode_from_bytes() {
+        let bytes = vec![(0 as u64).to_be_bytes(), (0 as u64).to_be_bytes()].concat();
+        let bytecode = Bytecode::from_bytes(&bytes).expect("Failed to parse bytecode");
+
+        let expected = Bytecode {
+            instructions: vec![],
+            constants: vec![],
+        };
+
+        assert_eq!(bytecode, expected);
     }
 }
