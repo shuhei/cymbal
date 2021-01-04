@@ -33,17 +33,16 @@ pub fn start(mode: Mode) {
     loop {
         let input = ask_input(">> ");
 
-        let mut parser = Parser::new(Lexer::new(input));
+        let parser = Parser::new(Lexer::new(input));
 
-        let program = parser.parse_program();
-        if !parser.errors().is_empty() {
-            println!("Woops! We ran into some monkey business here!");
-            println!(" parser errors:");
-            for error in parser.errors() {
-                println!("\t{:?}", error);
+        let program = match parser.parse_program() {
+            Ok(pg) => pg,
+            Err(err) => {
+                println!("Woops! We ran into some monkey business here!");
+                println!("\t{:?}", err);
+                continue;
             }
-            continue;
-        }
+        };
 
         match mode {
             Mode::Eval => match evaluator::eval(&program, Rc::clone(&env)) {

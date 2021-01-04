@@ -1284,22 +1284,9 @@ mod tests {
 
     fn parse(input: &str) -> Program {
         let lexer = Lexer::new(input.to_owned());
-        let mut parser = Parser::new(lexer);
+        let parser = Parser::new(lexer);
 
-        let program = parser.parse_program();
-        check_parser_errors(&parser);
-        program
-    }
-
-    fn check_parser_errors(parser: &Parser) {
-        let errors = parser.errors();
-        if errors.len() > 0 {
-            panic!(
-                "for input '{}', got parser errors: {:?}",
-                parser.input(),
-                errors
-            );
-        }
+        parser.parse_program().expect("parser error")
     }
 
     fn compiled_function(

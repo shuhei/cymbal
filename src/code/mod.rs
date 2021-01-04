@@ -1,5 +1,12 @@
+use std::convert::TryInto;
 use std::fmt;
+use std::io;
 
+pub trait Serializable {
+    fn serialize(&self, f: &mut dyn io::Write) -> io::Result<()>;
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Bytecode {
     pub instructions: Instructions,
     pub constants: Vec<Constant>,
@@ -11,6 +18,87 @@ impl Bytecode {
             instructions,
             constants,
         }
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
+        let mut cur = 0;
+        // TODO: What happens on 32-bit systems?
+        let instructions_size = read_be_u64(bytes, cur) as usize;
+        cur += 8;
+        let instructions = bytes[cur..(cur + instructions_size)].to_vec();
+        cur += instructions_size;
+
+        let constants_count = read_be_u64(bytes, cur) as usize;
+        cur += 8;
+
+        let mut constants = Vec::new();
+        while cur < bytes.len() {
+            let tag = bytes[cur];
+            cur += 1;
+
+            if tag == TAG_INTEGER {
+                constants.push(Constant::Integer(read_be_i64(bytes, cur)));
+                cur += 8;
+            } else if tag == TAG_FLOAT {
+                constants.push(Constant::Float(f64::from_bits(read_be_u64(bytes, cur))));
+                cur += 8;
+            } else if tag == TAG_STRING {
+                let string_len = read_be_u64(bytes, cur) as usize;
+                cur += 8;
+                let string = String::from_utf8(bytes[cur..(cur + string_len)].to_vec())
+                    .expect("error: Failed to read string constant");
+                cur += string_len;
+                constants.push(Constant::String(string));
+            } else if tag == TAG_FUNCTION {
+                let num_locals = bytes[cur];
+                let num_parameters = bytes[cur + 1];
+                cur += 2;
+                let instructions_size = read_be_u64(bytes, cur) as usize;
+                cur += 8;
+                let instructions = bytes[cur..(cur + instructions_size)].to_vec();
+                cur += instructions_size;
+                let cf = CompiledFunction {
+                    instructions,
+                    num_locals,
+                    num_parameters,
+                };
+                constants.push(Constant::CompiledFunction(cf));
+            } else {
+                return Err(format!("Unexpected tag {} at position {}", tag, cur));
+            }
+        }
+
+        if constants.len() != constants_count {
+            return Err(format!(
+                "Invalid constants cound: expect {} but got {}",
+                constants_count,
+                constants.len()
+            ));
+        }
+
+        Ok(Bytecode::new(instructions, constants))
+    }
+}
+
+fn read_be_u64(bytes: &[u8], start: usize) -> u64 {
+    // https://doc.rust-lang.org/std/primitive.u64.html#method.from_be_bytes
+    u64::from_be_bytes(bytes[start..(start + 8)].try_into().unwrap())
+}
+
+fn read_be_i64(bytes: &[u8], start: usize) -> i64 {
+    // https://doc.rust-lang.org/std/primitive.i64.html#method.from_be_bytes
+    i64::from_be_bytes(bytes[start..(start + 8)].try_into().unwrap())
+}
+
+impl Serializable for Bytecode {
+    fn serialize(&self, w: &mut dyn io::Write) -> io::Result<()> {
+        w.write_all(&(self.instructions.len() as u64).to_be_bytes())?;
+        w.write_all(&self.instructions)?;
+        w.write_all(&(self.constants.len() as u64).to_be_bytes())?;
+        for constant in &self.constants {
+            constant.serialize(w)?;
+        }
+        io::Result::Ok(())
     }
 }
 
@@ -326,6 +414,38 @@ impl Constant {
     }
 }
 
+const TAG_INTEGER: u8 = 1;
+const TAG_FLOAT: u8 = 2;
+const TAG_STRING: u8 = 3;
+const TAG_FUNCTION: u8 = 4;
+
+impl Serializable for Constant {
+    fn serialize(&self, w: &mut dyn io::Write) -> io::Result<()> {
+        match self {
+            Constant::Integer(value) => {
+                w.write_all(&TAG_INTEGER.to_be_bytes())?;
+                w.write_all(&value.to_be_bytes())?;
+            }
+            Constant::Float(value) => {
+                w.write_all(&TAG_FLOAT.to_be_bytes())?;
+                // https://github.com/rust-lang/rust/issues/60446
+                w.write_all(&value.to_bits().to_be_bytes())?;
+            }
+            Constant::String(value) => {
+                w.write_all(&TAG_STRING.to_be_bytes())?;
+                w.write_all(&(value.len() as u64).to_be_bytes())?;
+                w.write_all(value.as_bytes())?;
+            }
+            Constant::CompiledFunction(cf) => {
+                w.write_all(&[TAG_FUNCTION, cf.num_locals, cf.num_parameters])?;
+                w.write_all(&(cf.instructions.len() as u64).to_be_bytes())?;
+                w.write_all(&cf.instructions)?;
+            }
+        }
+        io::Result::Ok(())
+    }
+}
+
 impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -358,7 +478,7 @@ impl fmt::Display for CompiledFunction {
 
 #[cfg(test)]
 mod tests {
-    use crate::code::{make, make_u16, make_u16_u8, make_u8, print_instructions, OpCode};
+    use crate::code::{make, make_u16, make_u16_u8, make_u8, print_instructions, Bytecode, OpCode};
 
     #[test]
     fn test_print_instructions() {
@@ -379,5 +499,18 @@ mod tests {
 0015 OpPop";
 
         assert_eq!(&print_instructions(&insts), expected);
+    }
+
+    #[test]
+    fn empty_bytecode_from_bytes() {
+        let bytes = vec![(0 as u64).to_be_bytes(), (0 as u64).to_be_bytes()].concat();
+        let bytecode = Bytecode::from_bytes(&bytes).expect("Failed to parse bytecode");
+
+        let expected = Bytecode {
+            instructions: vec![],
+            constants: vec![],
+        };
+
+        assert_eq!(bytecode, expected);
     }
 }
